@@ -1,0 +1,2 @@
+ALTER TABLE developer
+    ALTER COLUMN email TYPE VARCHAR(254);

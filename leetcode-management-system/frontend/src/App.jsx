@@ -1,30 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import DeveloperPlatform from "./DeveloperPlatform.jsx";
+import { request } from "./services/api.js";
 
-const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const money = (value) => (value === null || value === undefined ? "—" : value);
 const defaultQuery = `SELECT COUNT(*) AS total_rows FROM developer;`;
-
-async function request(path, options = {}, skipAuth = false) {
-  const token = skipAuth ? null : sessionStorage.getItem("adminToken");
-  const headers = { "Content-Type": "application/json", ...options.headers };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const res = await fetch(`${API}${path}`, { ...options, headers });
-  const body = await res.json().catch(() => ({}));
-  if (res.status === 401 && token) {
-    sessionStorage.removeItem("adminToken");
-    window.dispatchEvent(new Event("admin:unauthorized"));
-  }
-  if (!res.ok) {
-    const detail = body.detail;
-    const message = Array.isArray(detail)
-      ? detail.map((item) => item.msg).filter(Boolean).join("; ")
-      : typeof detail === "string" ? detail : `HTTP ${res.status}`;
-    throw new Error(message || `HTTP ${res.status}`);
-  }
-  return body;
-}
 
 const sqlExamples = [
   { label: "Developer count", sql: "SELECT COUNT(*) AS total_developers FROM developer;" },
@@ -107,10 +87,15 @@ export default function App() {
     }
   }
 
-  async function signUp(username, password) {
+  async function signUp(profile, password) {
     await request("/api/auth/signup", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({
+        username: profile.email,
+        full_name: profile.fullName,
+        country: profile.country,
+        password,
+      }),
     }, true);
     setSignupNotice("Developer account created. Sign in with your new credentials.");
     setAuthScreen("login");
@@ -136,7 +121,7 @@ export default function App() {
     />;
   }
   if (user.role === "developer") {
-    return <DeveloperPortal user={user} onLogout={signOut} />;
+    return <DeveloperPlatform user={user} onLogout={signOut} />;
   }
   return <DashboardApp admin={user} onLogout={signOut} />;
 }
@@ -197,6 +182,8 @@ function Login({ onLogin, onShowSignup, notice }) {
 
 function Signup({ onSignup, onShowLogin }) {
   const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [country, setCountry] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -212,7 +199,11 @@ function Signup({ onSignup, onShowLogin }) {
 
     setLoading(true);
     try {
-      await onSignup(username.trim().toLowerCase(), password);
+      await onSignup({
+        email: username.trim().toLowerCase(),
+        fullName: fullName.trim(),
+        country: country.trim(),
+      }, password);
     } catch (signupError) {
       setError(signupError.message || "Unable to create the account. Please try again.");
     } finally {
@@ -226,11 +217,19 @@ function Signup({ onSignup, onShowLogin }) {
         <div className="loginBrandIcon">LC</div>
         <div className="eyebrow">DEVELOPER ACCESS</div>
         <h1>Create account</h1>
-        <p className="loginSubtitle">Register a developer account. Admin access is not available here.</p>
+        <p className="loginSubtitle">Create a developer profile. Admin access is not available here.</p>
         <form onSubmit={submit}>
           <label className="loginField">
-            <span>Username or email</span>
-            <input autoComplete="username" autoCapitalize="none" required minLength="3" maxLength="254" value={username} onChange={(event) => setUsername(event.target.value)} />
+            <span>Email address</span>
+            <input autoComplete="email" autoCapitalize="none" required type="email" maxLength="254" value={username} onChange={(event) => setUsername(event.target.value)} />
+          </label>
+          <label className="loginField">
+            <span>Display name</span>
+            <input autoComplete="name" required maxLength="100" value={fullName} onChange={(event) => setFullName(event.target.value)} />
+          </label>
+          <label className="loginField">
+            <span>Country</span>
+            <input autoComplete="country-name" required maxLength="60" value={country} onChange={(event) => setCountry(event.target.value)} />
           </label>
           <label className="loginField">
             <span>Password <small>(at least 12 characters)</small></span>
@@ -247,39 +246,6 @@ function Signup({ onSignup, onShowLogin }) {
         </form>
         <button className="authSwitch" type="button" onClick={onShowLogin}>Back to sign in</button>
         <div className="loginFootnote"><span /> Only developer accounts can be created here</div>
-      </section>
-    </main>
-  );
-}
-
-function DeveloperPortal({ user, onLogout }) {
-  const [profile, setProfile] = useState(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    request("/api/developer/me")
-      .then(setProfile)
-      .catch((profileError) => setError(profileError.message));
-  }, []);
-
-  return (
-    <main className="developerPage">
-      <header className="developerHeader">
-        <div>
-          <div className="eyebrow">LEETCODE MANAGEMENT STUDIO</div>
-          <h1>Developer workspace</h1>
-        </div>
-        <div className="adminControls">
-          <div className="adminIdentity"><strong>{user.username}</strong><span>Developer</span></div>
-          <button className="ghost logoutButton" onClick={onLogout}>Log out</button>
-        </div>
-      </header>
-      <section className="developerProfile panel">
-        <div className="eyebrow">YOUR ACCOUNT</div>
-        <h2>{profile?.username || user.username}</h2>
-        <p>Developer account · No administrator or database-management access</p>
-        {profile?.created_at && <small>Created {new Date(profile.created_at).toLocaleString()}</small>}
-        {error && <div className="error" role="alert">{error}</div>}
       </section>
     </main>
   );

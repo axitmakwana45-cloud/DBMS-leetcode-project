@@ -17,6 +17,7 @@ from .auth import (
     router as auth_router,
 )
 from .database import engine, refresh_metadata
+from .user_api import router as user_platform_router
 from .utils import row_dict
 
 load_dotenv()
@@ -87,7 +88,16 @@ async def require_admin_authentication(request: Request, call_next):
     request.state.current_user = current_user
     if path == "/api/auth/me":
         return await call_next(request)
-    if path.startswith("/api/developer/"):
+    developer_paths = (
+        "/api/developer/",
+        "/api/user/",
+        "/api/problems",
+        "/api/submissions",
+        "/api/languages",
+        "/api/leaderboard",
+        "/api/contests",
+    )
+    if path.startswith(developer_paths):
         if current_user["role"] != "developer":
             return JSONResponse(status_code=403, content={"detail": "Developer access required."})
         return await call_next(request)
@@ -98,6 +108,7 @@ async def require_admin_authentication(request: Request, call_next):
 
 app.include_router(auth_router)
 app.include_router(developer_router)
+app.include_router(user_platform_router)
 
 
 def normalize_name(name):

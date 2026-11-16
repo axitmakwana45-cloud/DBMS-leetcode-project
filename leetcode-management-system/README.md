@@ -6,7 +6,7 @@ A schema-aware CRUD and analytics application for the existing LeetCode Manageme
 - Backend: FastAPI + SQLAlchemy Core reflection
 - Frontend: React + Vite
 - Database: PostgreSQL
-- JWT-based administrator authentication
+- Role-based JWT authentication
 
 ## Important database note
 This project discovers tables, columns, and primary keys from your existing PostgreSQL database at runtime. Records are viewable for every discovered table. Writes are limited to tables listed in `CRUD_TABLES` in `backend/.env`.
@@ -18,8 +18,8 @@ The dark main dashboard includes date, country, difficulty, and language filters
 - Node.js 18+
 - PostgreSQL database with your existing schema
 
-## Authentication
-The application has one administrator account configured with `ADMIN_USERNAME` and `ADMIN_PASSWORD`; administrator accounts cannot be created through the public UI. The development/demo defaults are username `admin` and password `admin`; change both before deployment. Developers can create their own accounts and sign in, but developer accounts only see a limited profile page and cannot access administrator CRUD, analytics, or SQL APIs.
+## Authentication and developer platform
+The application has one administrator account configured with `ADMIN_USERNAME` and `ADMIN_PASSWORD`; administrator accounts cannot be created through the public UI. The development/demo defaults are username `admin` and password `admin`; change both before deployment. Developers can create their own accounts, but they cannot access administrator CRUD, analytics, or SQL APIs.
 
 The backend signs short-lived HS256 bearer tokens using `AUTH_SECRET`. Set it to a randomly generated secret of at least 32 characters; for example, in PowerShell:
 
@@ -29,14 +29,24 @@ py -c "import secrets; print(secrets.token_urlsafe(48))"
 
 The frontend stores the bearer token in `sessionStorage`, which limits its lifetime to the browser tab session but remains accessible to JavaScript. Use HTTPS in deployment and do not treat demo credentials or a frontend token as production-grade secret storage.
 
-Developer passwords are stored as PBKDF2 hashes in a separate `developer_auth_accounts` table. Before enabling developer signup, apply the SQL files in `backend/migrations` in numeric order to the configured PostgreSQL database using pgAdmin or `psql`. The app does not create or alter this table automatically. It is hidden from the management tables and unavailable in the SQL query tool.
+Developer passwords are stored as PBKDF2 hashes in a separate `developer_auth_accounts` table. Before enabling the platform on an existing database, apply any migrations in `backend/migrations` that have not already been applied, in numeric order, using pgAdmin or `psql`. Do not rerun migrations `003_user_platform_relations.sql` or `005_pending_submissions.sql`. The app does not create or alter the schema automatically. The auth table is hidden from the management tables and unavailable in the SQL query tool.
+
+The developer platform reads the existing developer, problem, tag, solve, submission, language, and contest records. Each account is linked to one developer profile. Developers can browse and filter problems, see public (non-hidden) examples, review only their own submissions and statistics, update their display name/country, join upcoming contests, and view an aggregate leaderboard. Submitting code only stores it with `PENDING` status: **this project has no code execution or judging service**, and a saved submission does not mark a problem solved.
 
 Authentication endpoints:
 - `POST /api/auth/login` — accepts `username` and `password`, returns a bearer token and the admin or developer identity.
-- `POST /api/auth/signup` — creates a developer account only; username or email is normalized to lowercase and passwords must contain at least 12 characters.
+- `POST /api/auth/signup` — creates a developer account and linked profile; requires `username` (an email address), `full_name`, `country`, and a password of at least 12 characters.
 - `GET /api/auth/me` — returns the authenticated identity.
 - `GET /api/developer/me` — returns the signed-in developer's own account profile.
-- Administrator management APIs require an admin token. Developer tokens are restricted to the developer profile endpoint. `GET /api/health`, login, and developer signup are public.
+
+Developer platform endpoints (developer token required):
+- `GET /api/problems` and `GET /api/problems/{problem_id}` — browse, filter, and read problems and public examples.
+- `GET /api/languages` — available submission languages.
+- `POST /api/submissions`, `GET /api/submissions/me`, and `GET /api/submissions/{submission_id}` — save code as not-evaluated, and view only the signed-in developer's submissions.
+- `GET /api/user/dashboard`, `/api/user/activity`, `/api/user/analytics`, and `/api/user/profile`; `PATCH /api/user/profile` — personal data and profile.
+- `GET /api/leaderboard`, `GET /api/contests`, and `POST /api/contests/{contest_id}/join`.
+
+Administrator management APIs require an admin token; developer APIs require a developer token. `GET /api/health`, login, and developer signup are public.
 
 ## 1. Configure backend
 Open PowerShell in the project folder:

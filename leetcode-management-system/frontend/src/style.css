@@ -301,3 +301,178 @@ tr:hover td { background: #172236; }
   .dashboardTitle h2 { font-size: 20px; }
   .dashboardChart { min-height: 310px; }
 }
+
+.userLayout {
+  --user-bg: #080e19;
+  --user-sidebar: #0e1726;
+  --user-panel: #111a2a;
+  --user-panel-soft: #0d1625;
+  --user-border: #202c41;
+  --user-text: #e7edf8;
+  --user-muted: #93a2b9;
+  --user-accent: #7892ff;
+  min-height: 100vh;
+  display: flex;
+  background: var(--user-bg);
+  color: var(--user-text);
+}
+.userLayout[data-theme="light"], :root[data-theme="light"] .userLayout {
+  --user-bg: #f3f5fa;
+  --user-sidebar: #fff;
+  --user-panel: #fff;
+  --user-panel-soft: #f5f7fc;
+  --user-border: #e0e5ef;
+  --user-text: #1c2638;
+  --user-muted: #69758b;
+  --user-accent: #526fe5;
+}
+:root[data-theme="light"] .userLayout { background: var(--user-bg); color: var(--user-text); }
+.userSidebar { width: 238px; flex-shrink: 0; display: flex; flex-direction: column; padding: 23px 15px 14px; border-right: 1px solid var(--user-border); background: var(--user-sidebar); }
+.userBrand { display: flex; align-items: center; gap: 11px; padding: 0 7px 28px; border: 0; background: none; color: var(--user-text); text-align: left; cursor: pointer; }
+.userBrand .brandIcon { flex-shrink: 0; }
+.userBrand b, .userBrand small { display: block; }
+.userBrand b { font: 700 14px Manrope; }
+.userBrand small { margin-top: 3px; color: var(--user-muted); font-size: 10px; }
+.userNavLabel { padding: 0 10px 10px; color: var(--user-muted); font-size: 9px; font-weight: 700; letter-spacing: 1.4px; }
+.userNav { display: grid; gap: 3px; }
+.userNav button { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--user-muted); font: 600 12px 'DM Sans'; text-align: left; cursor: pointer; }
+.userNav button span { width: 18px; color: var(--user-accent); font-size: 16px; text-align: center; }
+.userNav button:hover, .userNav button.active { background: #526fe522; color: var(--user-text); }
+.userSidebarFoot { display: flex; align-items: center; gap: 9px; margin-top: auto; padding: 13px 5px 2px; border-top: 1px solid var(--user-border); }
+.userAvatar, .profileAvatar { display: grid; flex-shrink: 0; place-items: center; border-radius: 50%; background: #526fe5; color: white; font: 700 14px Manrope; }
+.userAvatar { width: 34px; height: 34px; }
+.userIdentity { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 3px; }
+.userIdentity strong { overflow: hidden; color: var(--user-text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.userIdentity span { color: var(--user-muted); font-size: 9px; }
+.userIconButton { width: 28px; height: 28px; border: 1px solid var(--user-border); border-radius: 7px; background: var(--user-panel); color: var(--user-muted); cursor: pointer; }
+.userMain { min-width: 0; flex: 1; padding: 27px clamp(16px, 3vw, 42px) 55px; }
+.userTopbar { display: flex; align-items: center; justify-content: space-between; gap: 15px; max-width: 1500px; margin: 0 auto 23px; }
+.userTopbar h1 { margin: 4px 0 0; color: var(--user-text); font: 800 24px Manrope; }
+.userTopActions { display: flex; align-items: center; gap: 10px; }
+.userRoleBadge { padding: 7px 10px; border: 1px solid #526fe544; border-radius: 999px; background: #526fe51a; color: var(--user-accent); font-size: 10px; font-weight: 700; }
+.userPageContent { display: grid; gap: 17px; max-width: 1500px; margin: 0 auto; }
+.userWelcome { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 25px 27px; border: 1px solid #526fe555; border-radius: 15px; background: linear-gradient(110deg, #1a2a4a, #223b73); color: white; }
+.userWelcome h2 { margin: 7px 0; color: white; font: 800 21px Manrope; }
+.userWelcome p { margin: 0; color: #c3d0ed; font-size: 11px; }
+.userWelcome .eyebrow { color: #b6c6ff; }
+.userWelcome .primary { flex-shrink: 0; }
+.userSectionTitle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.userSectionTitle h2 { margin: 0; color: var(--user-text); font: 700 14px Manrope; }
+.userSectionTitle p { margin: 4px 0 0; color: var(--user-muted); font-size: 10px; }
+.userPanel { min-width: 0; padding: 17px; border: 1px solid var(--user-border); border-radius: 13px; background: var(--user-panel); color: var(--user-text); }
+.userStatsGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; }
+.userStat { display: flex; align-items: center; gap: 11px; min-height: 76px; padding: 13px; border: 1px solid var(--user-border); border-radius: 11px; background: var(--user-panel); }
+.userStatIcon { display: grid; flex-shrink: 0; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #526fe522; color: var(--user-accent); font: 700 14px Manrope; }
+.userStat small, .globalStat small { display: block; color: var(--user-muted); font-size: 9px; }
+.userStat strong { display: block; margin-top: 4px; color: var(--user-text); font: 800 17px Manrope; }
+.userTwoColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.globalStatsGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.globalStat { padding: 10px; border: 1px solid var(--user-border); border-radius: 9px; background: var(--user-panel-soft); }
+.globalStat strong { display: block; margin-top: 5px; color: var(--user-text); font: 700 16px Manrope; }
+.progressRow { margin: 16px 0; }
+.progressRow > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--user-muted); font-size: 10px; }
+.progressTrack { height: 7px; margin-top: 8px; overflow: hidden; border-radius: 99px; background: var(--user-panel-soft); }
+.progressTrack i { display: block; height: 100%; border-radius: inherit; }
+.progressFoot, .streakCaption { margin-top: 12px; color: var(--user-muted); font-size: 10px; }
+.difficultyBadge { display: inline-flex; width: fit-content; padding: 4px 7px; border-radius: 999px; background: #8290a91a; color: var(--user-muted); font-size: 9px; font-weight: 700; text-transform: capitalize; }
+.difficultyBadge.easy { background: #2dd4a41a; color: #2dd4a4; }
+.difficultyBadge.medium { background: #f4b7401a; color: #f4b740; }
+.difficultyBadge.hard { background: #f275831a; color: #f27583; }
+.heatmapWrap { overflow-x: auto; padding-bottom: 4px; }
+.heatmap { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 10px); grid-auto-columns: 10px; gap: 3px; width: max-content; }
+.heatCell { display: block; width: 10px; height: 10px; border-radius: 2px; background: #253044; }
+.heat1 { background: #204b41; }.heat2 { background: #247761; }.heat3 { background: #25a27d; }.heat4 { background: #2dd4a4; }
+.heatmapLegend { display: flex; align-items: center; gap: 4px; margin-top: 9px; color: var(--user-muted); font-size: 9px; }
+.heatmapLegend span:first-child { margin-right: 3px; }.heatmapLegend span:last-child { margin-left: 3px; }
+.recommendedProblem, .recentSubmission { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 2px; border: 0; border-bottom: 1px solid var(--user-border); background: transparent; color: var(--user-text); text-align: left; cursor: pointer; }
+.recommendedProblem strong { flex: 1; font-size: 10px; }
+.recommendedId { color: var(--user-muted); font-size: 9px; }
+.textLink { border: 0; background: none; color: var(--user-accent); font: 600 10px 'DM Sans'; cursor: pointer; }
+.recentSubmission span { display: flex; flex-direction: column; gap: 4px; }
+.recentSubmission strong { font-size: 10px; }.recentSubmission small { color: var(--user-muted); font-size: 9px; }
+.userChart { width: 100%; height: 235px; margin-top: 8px; }
+.problemFilters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.problemFilters input, .problemFilters select, .codePanel select, .analyticsHeading select, .userPagination select {
+  min-height: 37px; padding: 0 10px; border: 1px solid var(--user-border); border-radius: 8px; outline: none; background: var(--user-panel); color: var(--user-text); font: 11px 'DM Sans';
+}
+.problemFilters input { flex: 1 1 210px; }.problemFilters select { min-width: 125px; }
+.problemFilters input:focus, .problemFilters select:focus, .loginField input:focus { border-color: #718bff; }
+.problemTablePanel { padding: 0; overflow: hidden; }
+.userTableScroll { width: 100%; overflow: auto; }
+.userTable { min-width: 720px; border-collapse: collapse; width: 100%; font-size: 10px; }
+.userTable th { position: sticky; top: 0; padding: 11px 12px; background: var(--user-panel-soft); color: var(--user-muted); font-size: 9px; text-align: left; }
+.userTable td { max-width: 300px; padding: 11px 12px; border-top: 1px solid var(--user-border); color: var(--user-text); }
+.userTable tbody tr { cursor: pointer; }.userTable tbody tr:hover td { background: #526fe511; }
+.problemTitleLink { padding: 0; border: 0; background: none; color: var(--user-accent); font: 600 10px 'DM Sans'; text-align: left; cursor: pointer; }
+.topicChips { display: flex; flex-wrap: wrap; gap: 4px; }
+.topicChips i { padding: 3px 6px; border-radius: 999px; background: #526fe51a; color: var(--user-muted); font-size: 8px; font-style: normal; }
+.solvedMark { color: #2dd4a4; font-size: 9px; font-weight: 700; }.unsolvedMark { color: var(--user-muted); }
+.submissionStatus { display: inline-block; padding: 4px 7px; border-radius: 999px; background: #8290a91a; color: var(--user-muted); font-size: 8px; font-weight: 700; white-space: nowrap; }
+.submissionStatus.accepted { background: #2dd4a41a; color: #2dd4a4; }
+.submissionStatus.pending { background: #f4b7401a; color: #f4b740; }
+.submissionStatus.wrong_answer, .submissionStatus.runtime_error, .submissionStatus.compile_error, .submissionStatus.time_limit_exceeded, .submissionStatus.memory_limit_exceeded { background: #f275831a; color: #f27583; }
+.userPagination { display: flex; align-items: center; justify-content: space-between; gap: 9px; padding: 12px; border-top: 1px solid var(--user-border); color: var(--user-muted); font-size: 9px; }
+.userPagination > div { display: flex; gap: 6px; }
+.userPagination .ghost { padding: 6px 9px; font-size: 9px; }
+.userPagination .ghost:disabled { opacity: .4; cursor: not-allowed; }
+.userEmpty, .userLoading { padding: 27px 14px; color: var(--user-muted); font-size: 11px; text-align: center; }
+.userError { padding: 10px 12px; border: 1px solid #592a3c; border-radius: 8px; background: #361c27; color: #ff9aab; font-size: 10px; }
+.problemWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, .9fr); gap: 14px; align-items: start; }
+.problemDescription h2 { margin: 10px 0; font: 800 21px Manrope; }
+.problemDescription h3, .codePanel h3, .settingsPanel h3 { margin: 20px 0 8px; font: 700 13px Manrope; }
+.problemDetailMeta, .problemFacts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--user-muted); font-size: 9px; }
+.problemFacts { margin: 10px 0; gap: 14px; }
+.problemStatement { color: var(--user-text); font-size: 11px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.exampleBox { margin: 9px 0; padding: 11px; border: 1px solid var(--user-border); border-radius: 8px; background: var(--user-panel-soft); font-size: 10px; }
+.exampleBox pre { overflow: auto; color: var(--user-text); font: 10px/1.6 Consolas, monospace; white-space: pre-wrap; }
+.exampleBox pre b { color: var(--user-muted); }
+.problemPager { display: flex; justify-content: space-between; gap: 8px; margin-top: 15px; }
+.problemPager .ghost { max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codePanel { position: sticky; top: 15px; }
+.codePanelHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.codePanelHead h3 { margin: 0; }.codePanelHead p { margin: 5px 0 0; color: var(--user-muted); font-size: 9px; }
+.codePanel select { max-width: 150px; }
+.judgeNotice { margin: 13px 0; padding: 10px; border: 1px solid #664d2c; border-radius: 8px; background: #211a12; color: #edcc91; font-size: 9px; line-height: 1.6; }
+.judgeNotice strong { display: block; }
+.codeEditor, .savedCode { width: 100%; min-height: 280px; padding: 13px; border: 1px solid var(--user-border); border-radius: 8px; outline: none; resize: vertical; background: #080e19; color: #d9e3f2; font: 11px/1.65 Consolas, monospace; tab-size: 2; }
+.codeEditor:focus { border-color: #718bff; }.codePanel form .primary { margin-top: 10px; }
+.codePanel form .primary:disabled { opacity: .5; cursor: not-allowed; }
+.backLink { justify-self: start; }
+.analyticsHeading { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.analyticsHeading select { min-width: 125px; }
+.insightItem { margin: 7px 0; color: var(--user-muted); font-size: 10px; }
+.submissionMetrics, .judgeNote, .settingsNote { color: var(--user-muted); font-size: 10px; line-height: 1.7; }
+.savedCode { margin-top: 14px; white-space: pre; overflow: auto; }
+.contestGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.contestCard { display: flex; flex-direction: column; align-items: flex-start; }
+.contestCardTop { display: flex; justify-content: space-between; width: 100%; color: var(--user-muted); font-size: 9px; }
+.contestPhase { padding: 4px 7px; border-radius: 999px; background: #8290a91a; text-transform: capitalize; }.contestPhase.upcoming { color: #f4b740; }.contestPhase.active { color: #2dd4a4; }
+.contestCard h3 { margin: 13px 0 6px; font: 700 14px Manrope; }.contestCard p { min-height: 32px; color: var(--user-muted); font-size: 10px; }
+.contestDates { display: grid; gap: 5px; margin: 7px 0 13px; color: var(--user-muted); font-size: 9px; }
+.profileCard { text-align: center; }.profileAvatar { width: 64px; height: 64px; margin: 0 auto 12px; font-size: 23px; }
+.profileCard h2 { margin: 4px; font: 700 17px Manrope; }.profileCard > p { margin: 4px; color: var(--user-muted); font-size: 10px; }
+.profileDetails { display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; margin: 18px 0; text-align: left; }
+.profileDetails span { color: var(--user-muted); font-size: 10px; }.profileDetails strong { color: var(--user-text); font-size: 10px; overflow-wrap: anywhere; }
+.profileEditForm { max-width: 430px; margin: 0 auto; text-align: left; }.profileEditForm .loginField input { background: var(--user-panel-soft); color: var(--user-text); }
+.settingsPanel { display: flex; align-items: center; justify-content: space-between; gap: 14px; }.settingsPanel h3 { margin: 0; }.settingsPanel p { color: var(--user-muted); font-size: 10px; }
+.themeToggle { display: flex; flex-shrink: 0; padding: 3px; border: 1px solid var(--user-border); border-radius: 8px; }.themeToggle button { padding: 7px 11px; border: 0; border-radius: 6px; background: transparent; color: var(--user-muted); font-size: 10px; cursor: pointer; }.themeToggle button.active { background: #526fe5; color: white; }
+@media (max-width: 1050px) {
+  .userSidebar { width: 205px; }
+  .userStatsGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .problemWorkspace { grid-template-columns: 1fr; }
+  .codePanel { position: static; }
+}
+@media (max-width: 700px) {
+  .userSidebar { width: 60px; padding: 16px 6px 10px; }
+  .userBrand { justify-content: center; padding: 0 0 22px; }.userBrand > span:last-child, .userNavLabel, .userNav button:not(.active) { display: none; }
+  .userNav button { justify-content: center; gap: 0; padding: 10px 2px; font-size: 0; }.userNav button.active { display: flex; }
+  .userSidebarFoot { justify-content: center; flex-wrap: wrap; }.userIdentity, .userIconButton { display: none; }
+  .userMain { padding: 18px 12px 30px; }.userTopbar h1 { font-size: 19px; }.userTopActions .ghost { padding: 6px 8px; font-size: 9px; }
+  .userTwoColumns, .contestGrid { grid-template-columns: 1fr; }.userStatsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .userWelcome { align-items: flex-start; flex-direction: column; padding: 19px; }.userWelcome h2 { font-size: 17px; }
+  .globalStatsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .problemFilters input { flex-basis: 100%; }.problemFilters select { flex: 1; min-width: 0; }
+  .userPagination { flex-wrap: wrap; }.userPagination span { flex-basis: 100%; }
+  .analyticsHeading, .settingsPanel { align-items: flex-start; flex-direction: column; }
+  .profileDetails { grid-template-columns: 1fr 1.2fr; }
+}
