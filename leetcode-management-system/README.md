@@ -19,7 +19,7 @@ The dark main dashboard includes date, country, difficulty, and language filters
 - PostgreSQL database with your existing schema
 
 ## Authentication
-The application requires administrator sign-in before displaying its dashboard. There is no public registration. The development/demo defaults are username `admin` and password `admin`; change `ADMIN_USERNAME` and `ADMIN_PASSWORD` before deployment.
+The application has one administrator account configured with `ADMIN_USERNAME` and `ADMIN_PASSWORD`; administrator accounts cannot be created through the public UI. The development/demo defaults are username `admin` and password `admin`; change both before deployment. Developers can create their own accounts and sign in, but developer accounts only see a limited profile page and cannot access administrator CRUD, analytics, or SQL APIs.
 
 The backend signs short-lived HS256 bearer tokens using `AUTH_SECRET`. Set it to a randomly generated secret of at least 32 characters; for example, in PowerShell:
 
@@ -29,10 +29,14 @@ py -c "import secrets; print(secrets.token_urlsafe(48))"
 
 The frontend stores the bearer token in `sessionStorage`, which limits its lifetime to the browser tab session but remains accessible to JavaScript. Use HTTPS in deployment and do not treat demo credentials or a frontend token as production-grade secret storage.
 
+Developer passwords are stored as PBKDF2 hashes in a separate `developer_auth_accounts` table. Before enabling developer signup, apply `backend/migrations/001_developer_auth_accounts.sql` to the configured PostgreSQL database using pgAdmin or `psql`. The app does not create this table automatically. It is hidden from the management tables and unavailable in the SQL query tool.
+
 Authentication endpoints:
-- `POST /api/auth/login` — accepts `username` and `password`, returns a bearer token and admin identity.
-- `GET /api/auth/me` — returns the authenticated admin identity.
-- All other `/api/*` endpoints require `Authorization: Bearer <token>`, except `GET /api/health`.
+- `POST /api/auth/login` — accepts `username` and `password`, returns a bearer token and the admin or developer identity.
+- `POST /api/auth/signup` — creates a developer account only; usernames are normalized to lowercase and passwords must contain at least 12 characters.
+- `GET /api/auth/me` — returns the authenticated identity.
+- `GET /api/developer/me` — returns the signed-in developer's own account profile.
+- Administrator management APIs require an admin token. Developer tokens are restricted to the developer profile endpoint. `GET /api/health`, login, and developer signup are public.
 
 ## 1. Configure backend
 Open PowerShell in the project folder:

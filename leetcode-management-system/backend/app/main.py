@@ -10,7 +10,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import case, delete, func, insert, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 
-from .auth import decode_access_token, router as auth_router
+from .auth import (
+    DEVELOPER_AUTH_TABLE,
+    decode_access_token,
+    developer_router,
+    router as auth_router,
+)
 from .database import engine, refresh_metadata
 from .utils import row_dict
 
@@ -61,7 +66,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PUBLIC_API_PATHS = {"/api/health", "/api/auth/login"}
+PUBLIC_API_PATHS = {"/api/health", "/api/auth/login", "/api/auth/signup"}
 
 
 @app.middleware("http")
@@ -76,13 +81,23 @@ async def require_admin_authentication(request: Request, call_next):
         return JSONResponse(status_code=401, content={"detail": "Authentication required."})
 
     try:
-        request.state.admin = decode_access_token(token.strip())
+        current_user = decode_access_token(token.strip())
     except HTTPException as exc:
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    request.state.current_user = current_user
+    if path == "/api/auth/me":
+        return await call_next(request)
+    if path.startswith("/api/developer/"):
+        if current_user["role"] != "developer":
+            return JSONResponse(status_code=403, content={"detail": "Developer access required."})
+        return await call_next(request)
+    if current_user["role"] != "admin":
+        return JSONResponse(status_code=403, content={"detail": "Administrator access required."})
     return await call_next(request)
 
 
 app.include_router(auth_router)
+app.include_router(developer_router)
 
 
 def normalize_name(name):
@@ -100,7 +115,8 @@ def configured_names(raw_value, fallback):
 CRUD_TABLES = configured_names(os.getenv("CRUD_TABLES"), DEFAULT_TABLES)
 def get_tables():
     try:
-        return refresh_metadata().tables
+        tables = refresh_metadata().tables
+        return {name: table for name, table in tables.items() if name != DEVELOPER_AUTH_TABLE}
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=503, detail=f"Database metadata error: {exc}")
 
@@ -902,6 +918,9 @@ def validate_read_only_sql(sql: str, limit: int = 100):
         raise ValueError("Only a single SELECT statement is allowed.")
 
     normalized = re.sub(r"\s+", " ", cleaned).upper()
+    without_comments = re.sub(r"/\*.*?\*/|--[^\r\n]*", "", cleaned, flags=re.DOTALL).upper()
+    if DEVELOPER_AUTH_TABLE.upper() in without_comments:
+        raise ValueError("Authentication tables are not available in the custom SQL tool.")
     disallowed = [
         "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE",
         "CREATE", "GRANT", "REVOKE", "MERGE", "CALL", "EXEC", "COPY",

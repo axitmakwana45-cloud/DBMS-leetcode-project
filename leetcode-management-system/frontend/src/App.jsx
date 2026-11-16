@@ -43,14 +43,16 @@ const adminModules = [
 ];
 
 export default function App() {
-  const [admin, setAdmin] = useState(null);
+  const [user, setUser] = useState(null);
   const [authStatus, setAuthStatus] = useState("checking");
+  const [authScreen, setAuthScreen] = useState("login");
+  const [signupNotice, setSignupNotice] = useState("");
 
   useEffect(() => {
     let active = true;
     const handleUnauthorized = () => {
       sessionStorage.removeItem("adminToken");
-      setAdmin(null);
+      setUser(null);
       setAuthStatus("unauthenticated");
     };
     window.addEventListener("admin:unauthorized", handleUnauthorized);
@@ -59,9 +61,9 @@ export default function App() {
       setAuthStatus("unauthenticated");
     } else {
       request("/api/auth/me")
-        .then((currentAdmin) => {
+        .then((currentUser) => {
           if (active) {
-            setAdmin(currentAdmin);
+            setUser(currentUser);
             setAuthStatus("authenticated");
           }
         })
@@ -90,8 +92,8 @@ export default function App() {
 
     sessionStorage.setItem("adminToken", result.access_token);
     try {
-      const currentAdmin = await request("/api/auth/me");
-      setAdmin(currentAdmin);
+      const currentUser = await request("/api/auth/me");
+      setUser(currentUser);
       setAuthStatus("authenticated");
     } catch (error) {
       sessionStorage.removeItem("adminToken");
@@ -99,22 +101,41 @@ export default function App() {
     }
   }
 
+  async function signUp(username, password) {
+    await request("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }, true);
+    setSignupNotice("Developer account created. Sign in with your new credentials.");
+    setAuthScreen("login");
+  }
+
   function signOut() {
     sessionStorage.removeItem("adminToken");
-    setAdmin(null);
+    setUser(null);
     setAuthStatus("unauthenticated");
   }
 
   if (authStatus === "checking") {
-    return <div className="authLoading" role="status">Verifying administrator session…</div>;
+    return <div className="authLoading" role="status">Verifying session…</div>;
   }
   if (authStatus !== "authenticated") {
-    return <Login onLogin={signIn} />;
+    if (authScreen === "signup") {
+      return <Signup onSignup={signUp} onShowLogin={() => setAuthScreen("login")} />;
+    }
+    return <Login
+      onLogin={signIn}
+      onShowSignup={() => { setSignupNotice(""); setAuthScreen("signup"); }}
+      notice={signupNotice}
+    />;
   }
-  return <DashboardApp admin={admin} onLogout={signOut} />;
+  if (user.role === "developer") {
+    return <DeveloperPortal user={user} onLogout={signOut} />;
+  }
+  return <DashboardApp admin={user} onLogout={signOut} />;
 }
 
-function Login({ onLogin }) {
+function Login({ onLogin, onShowSignup, notice }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -140,7 +161,8 @@ function Login({ onLogin }) {
         <div className="loginBrandIcon">LC</div>
         <div className="eyebrow">LEETCODE MANAGEMENT STUDIO</div>
         <h1>Welcome back</h1>
-        <p className="loginSubtitle">Administrator Authentication</p>
+        <p className="loginSubtitle">Administrator or developer sign in</p>
+        {notice && <div className="loginSuccess" role="status">{notice}</div>}
         <form onSubmit={submit}>
           <label className="loginField">
             <span>Username</span>
@@ -160,7 +182,98 @@ function Login({ onLogin }) {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
-        <div className="loginFootnote"><span /> Restricted to authorized administrators</div>
+        <button className="authSwitch" type="button" onClick={onShowSignup}>Create a developer account</button>
+        <div className="loginFootnote"><span /> Admin accounts are managed outside public signup</div>
+      </section>
+    </main>
+  );
+}
+
+function Signup({ onSignup, onShowLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onSignup(username.trim().toLowerCase(), password);
+    } catch (signupError) {
+      setError(signupError.message || "Unable to create the account. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="loginPage">
+      <section className="loginCard">
+        <div className="loginBrandIcon">LC</div>
+        <div className="eyebrow">DEVELOPER ACCESS</div>
+        <h1>Create account</h1>
+        <p className="loginSubtitle">Register a developer account. Admin access is not available here.</p>
+        <form onSubmit={submit}>
+          <label className="loginField">
+            <span>Username</span>
+            <input autoComplete="username" autoCapitalize="none" required minLength="3" maxLength="80" value={username} onChange={(event) => setUsername(event.target.value)} />
+          </label>
+          <label className="loginField">
+            <span>Password <small>(at least 12 characters)</small></span>
+            <input autoComplete="new-password" required minLength="12" maxLength="128" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          </label>
+          <label className="loginField">
+            <span>Confirm password</span>
+            <input autoComplete="new-password" required minLength="12" maxLength="128" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+          </label>
+          {error && <div className="loginError" role="alert">{error}</div>}
+          <button className="loginSubmit" type="submit" disabled={loading}>
+            {loading ? "Creating account…" : "Create developer account"}
+          </button>
+        </form>
+        <button className="authSwitch" type="button" onClick={onShowLogin}>Back to sign in</button>
+        <div className="loginFootnote"><span /> Only developer accounts can be created here</div>
+      </section>
+    </main>
+  );
+}
+
+function DeveloperPortal({ user, onLogout }) {
+  const [profile, setProfile] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    request("/api/developer/me")
+      .then(setProfile)
+      .catch((profileError) => setError(profileError.message));
+  }, []);
+
+  return (
+    <main className="developerPage">
+      <header className="developerHeader">
+        <div>
+          <div className="eyebrow">LEETCODE MANAGEMENT STUDIO</div>
+          <h1>Developer workspace</h1>
+        </div>
+        <div className="adminControls">
+          <div className="adminIdentity"><strong>{user.username}</strong><span>Developer</span></div>
+          <button className="ghost logoutButton" onClick={onLogout}>Log out</button>
+        </div>
+      </header>
+      <section className="developerProfile panel">
+        <div className="eyebrow">YOUR ACCOUNT</div>
+        <h2>{profile?.username || user.username}</h2>
+        <p>Developer account · No administrator or database-management access</p>
+        {profile?.created_at && <small>Created {new Date(profile.created_at).toLocaleString()}</small>}
+        {error && <div className="error" role="alert">{error}</div>}
       </section>
     </main>
   );
