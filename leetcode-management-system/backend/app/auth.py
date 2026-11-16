@@ -37,27 +37,30 @@ developer_accounts = Table(
     DEVELOPER_AUTH_TABLE,
     auth_metadata,
     Column("id", Integer, primary_key=True),
-    Column("username", String(80), nullable=False, unique=True),
+    Column("username", String(254), nullable=False, unique=True),
     Column("password_hash", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
 
 class LoginRequest(BaseModel):
-    username: str
+    username: str = Field(max_length=254)
     password: str
 
 
 class SignupRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=80)
+    username: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=12, max_length=128)
 
     @field_validator("username")
     @classmethod
     def normalize_username(cls, value):
         username = value.strip().lower()
+        is_email = "@" in username and re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", username)
+        if is_email:
+            return username
         if not re.fullmatch(r"[a-z0-9_.-]{3,80}", username):
-            raise ValueError("Username may contain letters, numbers, dots, underscores, and hyphens.")
+            raise ValueError("Enter a valid email or a 3-80 character username.")
         return username
 
 

@@ -16,7 +16,13 @@ async function request(path, options = {}, skipAuth = false) {
     sessionStorage.removeItem("adminToken");
     window.dispatchEvent(new Event("admin:unauthorized"));
   }
-  if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const detail = body.detail;
+    const message = Array.isArray(detail)
+      ? detail.map((item) => item.msg).filter(Boolean).join("; ")
+      : typeof detail === "string" ? detail : `HTTP ${res.status}`;
+    throw new Error(message || `HTTP ${res.status}`);
+  }
   return body;
 }
 
@@ -223,8 +229,8 @@ function Signup({ onSignup, onShowLogin }) {
         <p className="loginSubtitle">Register a developer account. Admin access is not available here.</p>
         <form onSubmit={submit}>
           <label className="loginField">
-            <span>Username</span>
-            <input autoComplete="username" autoCapitalize="none" required minLength="3" maxLength="80" value={username} onChange={(event) => setUsername(event.target.value)} />
+            <span>Username or email</span>
+            <input autoComplete="username" autoCapitalize="none" required minLength="3" maxLength="254" value={username} onChange={(event) => setUsername(event.target.value)} />
           </label>
           <label className="loginField">
             <span>Password <small>(at least 12 characters)</small></span>

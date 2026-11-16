@@ -29,11 +29,11 @@ py -c "import secrets; print(secrets.token_urlsafe(48))"
 
 The frontend stores the bearer token in `sessionStorage`, which limits its lifetime to the browser tab session but remains accessible to JavaScript. Use HTTPS in deployment and do not treat demo credentials or a frontend token as production-grade secret storage.
 
-Developer passwords are stored as PBKDF2 hashes in a separate `developer_auth_accounts` table. Before enabling developer signup, apply `backend/migrations/001_developer_auth_accounts.sql` to the configured PostgreSQL database using pgAdmin or `psql`. The app does not create this table automatically. It is hidden from the management tables and unavailable in the SQL query tool.
+Developer passwords are stored as PBKDF2 hashes in a separate `developer_auth_accounts` table. Before enabling developer signup, apply the SQL files in `backend/migrations` in numeric order to the configured PostgreSQL database using pgAdmin or `psql`. The app does not create or alter this table automatically. It is hidden from the management tables and unavailable in the SQL query tool.
 
 Authentication endpoints:
 - `POST /api/auth/login` — accepts `username` and `password`, returns a bearer token and the admin or developer identity.
-- `POST /api/auth/signup` — creates a developer account only; usernames are normalized to lowercase and passwords must contain at least 12 characters.
+- `POST /api/auth/signup` — creates a developer account only; username or email is normalized to lowercase and passwords must contain at least 12 characters.
 - `GET /api/auth/me` — returns the authenticated identity.
 - `GET /api/developer/me` — returns the signed-in developer's own account profile.
 - Administrator management APIs require an admin token. Developer tokens are restricted to the developer profile endpoint. `GET /api/health`, login, and developer signup are public.
