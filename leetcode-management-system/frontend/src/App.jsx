@@ -5,6 +5,21 @@ const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 const money = (value) => (value === null || value === undefined ? "—" : value);
 const defaultQuery = `SELECT COUNT(*) AS total_rows FROM developer;`;
 
+async function request(path, options = {}, skipAuth = false) {
+  const token = skipAuth ? null : sessionStorage.getItem("adminToken");
+  const headers = { "Content-Type": "application/json", ...options.headers };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API}${path}`, { ...options, headers });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 401 && token) {
+    sessionStorage.removeItem("adminToken");
+    window.dispatchEvent(new Event("admin:unauthorized"));
+  }
+  if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);
+  return body;
+}
+
 const sqlExamples = [
   { label: "Developer count", sql: "SELECT COUNT(*) AS total_developers FROM developer;" },
   { label: "Problems by difficulty", sql: "SELECT difficulty, COUNT(*) AS total FROM programming_problem GROUP BY difficulty ORDER BY total DESC;" },
@@ -28,6 +43,130 @@ const adminModules = [
 ];
 
 export default function App() {
+  const [admin, setAdmin] = useState(null);
+  const [authStatus, setAuthStatus] = useState("checking");
+
+  useEffect(() => {
+    let active = true;
+    const handleUnauthorized = () => {
+      sessionStorage.removeItem("adminToken");
+      setAdmin(null);
+      setAuthStatus("unauthenticated");
+    };
+    window.addEventListener("admin:unauthorized", handleUnauthorized);
+
+    if (!sessionStorage.getItem("adminToken")) {
+      setAuthStatus("unauthenticated");
+    } else {
+      request("/api/auth/me")
+        .then((currentAdmin) => {
+          if (active) {
+            setAdmin(currentAdmin);
+            setAuthStatus("authenticated");
+          }
+        })
+        .catch(() => {
+          if (active) {
+            sessionStorage.removeItem("adminToken");
+            setAuthStatus("unauthenticated");
+          }
+        });
+    }
+
+    return () => {
+      active = false;
+      window.removeEventListener("admin:unauthorized", handleUnauthorized);
+    };
+  }, []);
+
+  async function signIn(username, password) {
+    const result = await request("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }, true);
+    if (!result.access_token || result.token_type?.toLowerCase() !== "bearer") {
+      throw new Error("The server returned an invalid login response.");
+    }
+
+    sessionStorage.setItem("adminToken", result.access_token);
+    try {
+      const currentAdmin = await request("/api/auth/me");
+      setAdmin(currentAdmin);
+      setAuthStatus("authenticated");
+    } catch (error) {
+      sessionStorage.removeItem("adminToken");
+      throw error;
+    }
+  }
+
+  function signOut() {
+    sessionStorage.removeItem("adminToken");
+    setAdmin(null);
+    setAuthStatus("unauthenticated");
+  }
+
+  if (authStatus === "checking") {
+    return <div className="authLoading" role="status">Verifying administrator session…</div>;
+  }
+  if (authStatus !== "authenticated") {
+    return <Login onLogin={signIn} />;
+  }
+  return <DashboardApp admin={admin} onLogout={signOut} />;
+}
+
+function Login({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await onLogin(username.trim(), password);
+    } catch (loginError) {
+      setError(loginError.message || "Unable to sign in. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="loginPage">
+      <section className="loginCard">
+        <div className="loginBrandIcon">LC</div>
+        <div className="eyebrow">LEETCODE MANAGEMENT STUDIO</div>
+        <h1>Welcome back</h1>
+        <p className="loginSubtitle">Administrator Authentication</p>
+        <form onSubmit={submit}>
+          <label className="loginField">
+            <span>Username</span>
+            <input autoComplete="username" required value={username} onChange={(event) => setUsername(event.target.value)} />
+          </label>
+          <label className="loginField">
+            <span>Password</span>
+            <div className="passwordInput">
+              <input autoComplete="current-password" required type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} />
+              <button type="button" className="passwordToggle" onClick={() => setShowPassword((shown) => !shown)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+          </label>
+          {error && <div className="loginError" role="alert">{error}</div>}
+          <button className="loginSubmit" type="submit" disabled={loading}>
+            {loading ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+        <div className="loginFootnote"><span /> Restricted to authorized administrators</div>
+      </section>
+    </main>
+  );
+}
+
+function DashboardApp({ admin, onLogout }) {
   const [page, setPage] = useState("Dashboard");
   const [tables, setTables] = useState([]);
   const [table, setTable] = useState("programming_problem");
@@ -55,16 +194,6 @@ export default function App() {
   const current = tables.find((item) => item.name === table) || tables[0] || null;
   const cols = current?.columns || [];
   const hasDifficulty = cols.some((column) => column.name.toLowerCase().includes("difficulty"));
-
-  async function request(path, options = {}) {
-    const res = await fetch(`${API}${path}`, {
-      headers: { "Content-Type": "application/json" },
-      ...options,
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.detail || `HTTP ${res.status}`);
-    return body;
-  }
 
   async function loadTables() {
     try {
@@ -260,8 +389,14 @@ export default function App() {
             <div className="eyebrow">LEETCODE MANAGEMENT SYSTEM</div>
             <h1>{page}</h1>
           </div>
-          <div className={`status ${connection === "connected" ? "online" : connection === "disconnected" ? "offline" : ""}`}>
-            <i /> {connection === "connected" ? "Database connected" : connection === "disconnected" ? "Database unavailable" : "Checking database"}
+          <div className="topbarRight">
+            <div className={`status ${connection === "connected" ? "online" : connection === "disconnected" ? "offline" : ""}`}>
+              <i /> {connection === "connected" ? "Database connected" : connection === "disconnected" ? "Database unavailable" : "Checking database"}
+            </div>
+            <div className="adminControls">
+              <div className="adminIdentity"><strong>{admin.username}</strong><span>Administrator</span></div>
+              <button className="ghost logoutButton" onClick={onLogout}>Log out</button>
+            </div>
           </div>
         </header>
 

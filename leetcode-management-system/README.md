@@ -6,7 +6,7 @@ A schema-aware CRUD and analytics application for the existing LeetCode Manageme
 - Backend: FastAPI + SQLAlchemy Core reflection
 - Frontend: React + Vite
 - Database: PostgreSQL
-- No authentication (as requested)
+- JWT-based administrator authentication
 
 ## Important database note
 This project discovers tables, columns, and primary keys from your existing PostgreSQL database at runtime. Records are viewable for every discovered table. Writes are limited to tables listed in `CRUD_TABLES` in `backend/.env`.
@@ -17,6 +17,22 @@ The dark main dashboard includes date, country, difficulty, and language filters
 - Python 3.10+
 - Node.js 18+
 - PostgreSQL database with your existing schema
+
+## Authentication
+The application requires administrator sign-in before displaying its dashboard. There is no public registration. The development/demo defaults are username `admin` and password `admin`; change `ADMIN_USERNAME` and `ADMIN_PASSWORD` before deployment.
+
+The backend signs short-lived HS256 bearer tokens using `AUTH_SECRET`. Set it to a randomly generated secret of at least 32 characters; for example, in PowerShell:
+
+```powershell
+py -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+The frontend stores the bearer token in `sessionStorage`, which limits its lifetime to the browser tab session but remains accessible to JavaScript. Use HTTPS in deployment and do not treat demo credentials or a frontend token as production-grade secret storage.
+
+Authentication endpoints:
+- `POST /api/auth/login` — accepts `username` and `password`, returns a bearer token and admin identity.
+- `GET /api/auth/me` — returns the authenticated admin identity.
+- All other `/api/*` endpoints require `Authorization: Bearer <token>`, except `GET /api/health`.
 
 ## 1. Configure backend
 Open PowerShell in the project folder:
@@ -29,13 +45,17 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `backend/.env` and set a valid PostgreSQL connection string:
+Edit `backend/.env` and set the database URL and a strong `AUTH_SECRET`:
 
 ```env
 DATABASE_URL=postgresql+psycopg2://postgres:YOUR_PASSWORD@localhost:5432/YOUR_DATABASE
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin
+AUTH_SECRET=PASTE_A_RANDOM_SECRET_HERE
+AUTH_TOKEN_TTL=3600
 ```
 
-Use your actual database name, username, password, host, and port.
+Use your actual database name, username, password, host, and port. The `admin/admin` defaults are for local development/demo use only.
 
 ## 2. Start backend
 From `backend` with virtual environment activated:
@@ -98,4 +118,5 @@ For update/delete, `primary_key_json` is URL-encoded JSON. The frontend construc
 - Records are view-only unless their table is included in `CRUD_TABLES`; restart the backend after changing the setting.
 - CORS: the default configuration permits both `http://localhost:5173` and `http://127.0.0.1:5173`.
 - If the dashboard says the database is unavailable, confirm `backend/.env` contains your real `DATABASE_URL`, PostgreSQL is running, and the backend is started before opening the frontend.
-- Do not commit `.env` or publish database credentials to GitHub.
+- If the backend refuses to start, verify `AUTH_SECRET` is set to a random value at least 32 characters long.
+- Do not commit `.env` or publish database credentials, admin credentials, or the signing secret to GitHub.

@@ -4,11 +4,13 @@ import re
 from urllib.parse import unquote
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import case, delete, func, insert, select, text, update
 from sqlalchemy.exc import SQLAlchemyError
 
+from .auth import decode_access_token, router as auth_router
 from .database import engine, refresh_metadata
 from .utils import row_dict
 
@@ -58,6 +60,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+PUBLIC_API_PATHS = {"/api/health", "/api/auth/login"}
+
+
+@app.middleware("http")
+async def require_admin_authentication(request: Request, call_next):
+    path = request.url.path
+    if request.method == "OPTIONS" or not path.startswith("/api/") or path in PUBLIC_API_PATHS:
+        return await call_next(request)
+
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if not separator or scheme.lower() != "bearer" or not token.strip():
+        return JSONResponse(status_code=401, content={"detail": "Authentication required."})
+
+    try:
+        request.state.admin = decode_access_token(token.strip())
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    return await call_next(request)
+
+
+app.include_router(auth_router)
 
 
 def normalize_name(name):
