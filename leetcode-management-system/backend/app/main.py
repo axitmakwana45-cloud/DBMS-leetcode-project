@@ -12,12 +12,14 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .auth import (
     DEVELOPER_AUTH_TABLE,
+    COMPANY_AUTH_TABLE,
     decode_access_token,
     developer_router,
     router as auth_router,
 )
 from .database import engine, refresh_metadata
 from .user_api import router as user_platform_router
+from .company_api import router as company_portal_router
 from .utils import row_dict
 
 load_dotenv()
@@ -88,6 +90,10 @@ async def require_admin_authentication(request: Request, call_next):
     request.state.current_user = current_user
     if path == "/api/auth/me":
         return await call_next(request)
+    if path.startswith("/api/company/"):
+        if current_user["role"] != "company":
+            return JSONResponse(status_code=403, content={"detail": "Company access required."})
+        return await call_next(request)
     developer_paths = (
         "/api/developer/",
         "/api/user/",
@@ -109,6 +115,7 @@ async def require_admin_authentication(request: Request, call_next):
 app.include_router(auth_router)
 app.include_router(developer_router)
 app.include_router(user_platform_router)
+app.include_router(company_portal_router)
 
 
 def normalize_name(name):
@@ -127,7 +134,7 @@ CRUD_TABLES = configured_names(os.getenv("CRUD_TABLES"), DEFAULT_TABLES)
 def get_tables():
     try:
         tables = refresh_metadata().tables
-        return {name: table for name, table in tables.items() if name != DEVELOPER_AUTH_TABLE}
+        return {name: table for name, table in tables.items() if name not in {DEVELOPER_AUTH_TABLE, COMPANY_AUTH_TABLE}}
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=503, detail=f"Database metadata error: {exc}")
 
