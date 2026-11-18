@@ -82,7 +82,7 @@ class CompanySignupRequest(BaseModel):
     @classmethod
     def normalize_company_email(cls, value):
         username = value.strip().lower()
-        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", username):
+        if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", username):
             raise ValueError("Enter a valid company email address.")
         return username
 
@@ -204,4 +204,154 @@ def login(credentials: LoginRequest):
     return result
 
 
+@router.post("/signup", status_code=status.HTTP_201_CREATED)
+def signup(credentials: SignupRequest):
+    username = credentials.username
+    if hmac.compare_digest(username.casefold().encode("utf-8"), ADMIN_USERNAME.casefold().encode("utf-8")):
+        raise HTTPException(status_code=409, detail="This username is reserved.")
 
+    try:
+        with engine.begin() as conn:
+            hashed_password = password_hash(credentials.password)
+            base_username = re.sub(r"[^a-z0-9_.-]", "", username.split("@", 1)[0])[:30] or "developer"
+            developer_username = f"{base_username}_{secrets.token_hex(4)}"
+            developer_id = conn.execute(
+                insert(developers).values(
+                    username=developer_username,
+                    full_name=credentials.full_name,
+                    email=username,
+                    password_hash=hashed_password,
+                    country=credentials.country,
+                    joined_on=datetime.now(timezone.utc).date(),
+                ).returning(developers.c.developer_id)
+            ).scalar_one()
+            conn.execute(
+                insert(developer_accounts).values(
+                    username=username,
+                    password_hash=hashed_password,
+                    developer_id=developer_id,
+                )
+            )
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="Username is already registered.") from exc
+    except SQLAlchemyError as exc:
+        developer_accounts_unavailable(exc)
+
+    return {"message": "Developer account created.", "developer": account_identity(username, "developer")}
+
+
+@router.post("/company-signup", status_code=status.HTTP_201_CREATED)
+def company_signup(credentials: CompanySignupRequest):
+    from .database import refresh_metadata
+
+    try:
+        company_table = refresh_metadata().tables.get("company")
+        if company_table is None:
+            raise HTTPException(status_code=503, detail="The existing company table was not found.")
+        company_id_col = next((company_table.c[name] for name in ("company_id", "id") if name in company_table.c), None)
+        if company_id_col is None:
+            raise HTTPException(status_code=503, detail="The company table needs a company_id primary key.")
+        values = {}
+        for candidates, value in [
+            (("name", "company_name"), credentials.company_name),
+            (("industry", "sector", "company_type"), credentials.industry),
+            (("email", "contact_email"), credentials.email),
+        ]:
+            target = next((company_table.c[name] for name in candidates if name in company_table.c), None)
+            if target is not None:
+                values[target.name] = value
+        with engine.begin() as conn:
+            company_id = conn.execute(insert(company_table).values(**values).returning(company_id_col)).scalar_one()
+            conn.execute(insert(company_accounts).values(
+                email=credentials.email,
+                password_hash=password_hash(credentials.password),
+                company_id=company_id,
+            ))
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="A company account with this email or company identity already exists.") from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Company account setup failed. Check the company table schema and apply migration 006.") from exc
+    return {"message": "Company account created. You can now sign in.", "company": {"email": credentials.email, "role": "company", "company_id": company_id}}
+
+
+@router.get("/me")
+def current_user(request: Request):
+    return request.state.current_user
+
+
+@developer_router.get("/me")
+def current_developer(request: Request):
+    username = request.state.current_user["username"]
+    try:
+        with engine.connect() as conn:
+            account = conn.execute(
+                select(
+                    developer_accounts.c.username,
+                    developer_accounts.c.created_at,
+                    developers.c.developer_id,
+                    developers.c.full_name,
+                    developers.c.email,
+                    developers.c.country,
+                    developers.c.rating,
+                    developers.c.joined_on,
+                ).select_from(
+                    developer_accounts.join(
+                        developers,
+                        developer_accounts.c.developer_id == developers.c.developer_id,
+                    )
+                ).where(
+                    developer_accounts.c.username == username
+                )
+            ).mappings().first()
+    except SQLAlchemyError as exc:
+        developer_accounts_unavailable(exc)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Developer account not found.")
+    created_at = account["created_at"]
+    return {
+        "username": account["username"],
+        "role": "developer",
+        "developer_id": account["developer_id"],
+        "full_name": account["full_name"],
+        "email": account["email"],
+        "country": account["country"],
+        "rating": account["rating"],
+        "joined_on": account["joined_on"].isoformat() if account["joined_on"] else None,
+        "created_at": created_at.isoformat() if created_at else None,
+    }
+
+
+def decode_access_token(token: str):
+    try:
+        claims = jwt.decode(
+            token,
+            AUTH_SECRET,
+            algorithms=["HS256"],
+            options={"require": ["exp", "iat", "sub", "role"]},
+        )
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.") from exc
+
+    username = claims["sub"]
+    role = claims["role"]
+    if not isinstance(username, str) or role not in {"admin", "developer", "company"}:
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    if role == "admin" and username != ADMIN_USERNAME:
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    developer_id = claims.get("developer_id")
+    if role == "company":
+        company_id = claims.get("company_id")
+        if not isinstance(company_id, int) or company_id < 1:
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    if role == "developer" and (
+        username.casefold() == ADMIN_USERNAME.casefold()
+        or not isinstance(developer_id, int)
+        or developer_id < 1
+    ):
+        raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
+    identity = account_identity(username, role)
+    if developer_id is not None:
+        identity["developer_id"] = developer_id
+    if role == "company":
+        identity["company_id"] = claims["company_id"]
+    return identity
