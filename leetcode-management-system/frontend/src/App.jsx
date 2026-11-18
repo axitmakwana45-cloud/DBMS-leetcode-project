@@ -167,7 +167,7 @@ function Login({ onLogin, onShowSignup, onShowCompanySignup, notice }) {
         <div className="loginBrandIcon">LC</div>
         <div className="eyebrow">LEETCODE MANAGEMENT STUDIO</div>
         <h1>Welcome back</h1>
-        <p className="loginSubtitle">Administrator or developer sign in</p>
+        <p className="loginSubtitle">Administrator, developer or company sign in</p>
         {notice && <div className="loginSuccess" role="status">{notice}</div>}
         <form onSubmit={submit}>
           <label className="loginField">
@@ -379,7 +379,7 @@ function CompanyPortal({ user, onLogout }) {
           <div className="selectionList">{options.problems.map(problem => <label key={problem.id}><input type="checkbox" checked={problemIds.includes(problem.id)} onChange={() => toggle(setProblemIds, problemIds, problem.id)} /> {problem.title} <small>#{problem.id}</small></label>)}</div>
           <h3>Assign developers ({developerIds.length} selected)</h3>
           <div className="selectionList">{options.developers.map(dev => <label key={dev.id}><input type="checkbox" checked={developerIds.includes(dev.id)} onChange={() => toggle(setDeveloperIds, developerIds, dev.id)} /> {dev.name} <small>#{dev.id}</small></label>)}</div>
-          <div className="modalFoot"><button type="button" className="ghost" onClick={() => setShowForm(false)}>Cancel</button><button className="primary" disabled={busy || !problemIds.length}>{busy ? "Creating…" : "Create and assign"}</button></div>
+          <div className="modalFoot"><button type="button" className="ghost" onClick={() => setShowForm(false)}>Cancel</button><button className="primary" disabled={busy || !problemIds.length || !developerIds.length}>{busy ? "Creating…" : "Create and assign"}</button></div>
         </form>
       </section>}
       <section className="userPanel">
