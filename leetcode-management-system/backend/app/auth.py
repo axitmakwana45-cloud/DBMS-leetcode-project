@@ -34,6 +34,7 @@ if AUTH_TOKEN_TTL < 1:
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 developer_router = APIRouter(prefix="/api/developer", tags=["developer"])
 auth_metadata = MetaData()
+companies = Table("company", auth_metadata, Column("company_id", Integer, primary_key=True))
 company_accounts = Table(
     COMPANY_AUTH_TABLE,
     auth_metadata,
