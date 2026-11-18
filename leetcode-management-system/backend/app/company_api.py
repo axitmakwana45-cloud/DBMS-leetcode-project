@@ -99,7 +99,8 @@ def company_dashboard(request: Request):
                     if isinstance(value, datetime) and value.tzinfo is None:
                         return value.replace(tzinfo=timezone.utc)
                     if isinstance(value, date) and not isinstance(value, datetime):
-                        return datetime.combine(value, time.min, tzinfo=timezone.utc)
+                        boundary = time.max if "end" in name or "deadline" in name else time.min
+                        return datetime.combine(value, boundary, tzinfo=timezone.utc)
                     return value
             return None
         active = upcoming = completed = 0
@@ -189,6 +190,8 @@ def create_assessment(payload: AssessmentCreate, request: Request):
         with engine.begin() as conn:
             assessment_id = conn.execute(insert(assessment).values(**values).returning(assessment_pk)).scalar_one()
             assessment_problem = table_named(all_tables, "assessment_problem")
+            if assessment_problem is None:
+                raise HTTPException(status_code=503, detail="assessment_problem table is required to attach selected problems.")
             if assessment_problem is not None:
                 ap_assessment = col(assessment_problem, "assessment_id")
                 ap_problem = col(assessment_problem, "problem_id")
