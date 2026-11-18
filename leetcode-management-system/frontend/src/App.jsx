@@ -88,16 +88,24 @@ export default function App() {
   }
 
   async function signUp(profile, password) {
-    await request("/api/auth/signup", {
+    const companyMode = authScreen === "company-signup";
+    await request(companyMode ? "/api/auth/company-signup" : "/api/auth/signup", {
       method: "POST",
-      body: JSON.stringify({
+      body: JSON.stringify(companyMode ? {
+        email: profile.email,
+        company_name: profile.companyName,
+        industry: profile.industry,
+        website: profile.website,
+        location: profile.location,
+        password,
+      } : {
         username: profile.email,
         full_name: profile.fullName,
         country: profile.country,
         password,
       }),
     }, true);
-    setSignupNotice("Developer account created. Sign in with your new credentials.");
+    setSignupNotice(companyMode ? "Company account created. Sign in with your company email." : "Developer account created. Sign in with your new credentials.");
     setAuthScreen("login");
   }
 
@@ -114,19 +122,26 @@ export default function App() {
     if (authScreen === "signup") {
       return <Signup onSignup={signUp} onShowLogin={() => setAuthScreen("login")} />;
     }
+    if (authScreen === "company-signup") {
+      return <CompanySignup onSignup={signUp} onShowLogin={() => setAuthScreen("login")} />;
+    }
     return <Login
       onLogin={signIn}
       onShowSignup={() => { setSignupNotice(""); setAuthScreen("signup"); }}
+      onShowCompanySignup={() => { setSignupNotice(""); setAuthScreen("company-signup"); }}
       notice={signupNotice}
     />;
   }
   if (user.role === "developer") {
     return <DeveloperPlatform user={user} onLogout={signOut} />;
   }
+  if (user.role === "company") {
+    return <CompanyPortal user={user} onLogout={signOut} />;
+  }
   return <DashboardApp admin={user} onLogout={signOut} />;
 }
 
-function Login({ onLogin, onShowSignup, notice }) {
+function Login({ onLogin, onShowSignup, onShowCompanySignup, notice }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -152,7 +167,7 @@ function Login({ onLogin, onShowSignup, notice }) {
         <div className="loginBrandIcon">LC</div>
         <div className="eyebrow">LEETCODE MANAGEMENT STUDIO</div>
         <h1>Welcome back</h1>
-        <p className="loginSubtitle">Administrator or developer sign in</p>
+        <p className="loginSubtitle">Administrator, developer or company sign in</p>
         {notice && <div className="loginSuccess" role="status">{notice}</div>}
         <form onSubmit={submit}>
           <label className="loginField">
@@ -174,6 +189,7 @@ function Login({ onLogin, onShowSignup, notice }) {
           </button>
         </form>
         <button className="authSwitch" type="button" onClick={onShowSignup}>Create a developer account</button>
+        <button className="authSwitch" type="button" onClick={onShowCompanySignup}>Register your company</button>
         <div className="loginFootnote"><span /> Admin accounts are managed outside public signup</div>
       </section>
     </main>
@@ -249,6 +265,141 @@ function Signup({ onSignup, onShowLogin }) {
       </section>
     </main>
   );
+}
+
+function CompanySignup({ onSignup, onShowLogin }) {
+  const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [website, setWebsite] = useState("");
+  const [location, setLocation] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+    if (password !== confirmPassword) return setError("Passwords do not match.");
+    setLoading(true);
+    try {
+      await onSignup({ email: email.trim().toLowerCase(), companyName: companyName.trim(), industry: industry.trim(), website: website.trim(), location: location.trim() }, password);
+    } catch (err) {
+      setError(err.message || "Unable to create company account.");
+    } finally { setLoading(false); }
+  }
+  return <main className="loginPage"><section className="loginCard">
+    <div className="loginBrandIcon">LC</div><div className="eyebrow">COMPANY ACCESS</div>
+    <h1>Register company</h1><p className="loginSubtitle">Create a company account to manage developer assessments.</p>
+    <form onSubmit={submit}>
+      <label className="loginField"><span>Company name</span><input required minLength="2" maxLength="120" value={companyName} onChange={e => setCompanyName(e.target.value)} /></label>
+      <label className="loginField"><span>Work email</span><input required type="email" maxLength="254" value={email} onChange={e => setEmail(e.target.value)} /></label>
+      <label className="loginField"><span>Industry</span><input required minLength="2" maxLength="100" placeholder="e.g. Software / IT" value={industry} onChange={e => setIndustry(e.target.value)} /></label>
+      <label className="loginField"><span>Website (optional)</span><input type="url" maxLength="255" value={website} onChange={e => setWebsite(e.target.value)} /></label>
+      <label className="loginField"><span>Headquarters / Location (optional)</span><input maxLength="160" value={location} onChange={e => setLocation(e.target.value)} /></label>
+      <label className="loginField"><span>Password (minimum 12 characters)</span><input required type="password" minLength="12" maxLength="128" value={password} onChange={e => setPassword(e.target.value)} /></label>
+      <label className="loginField"><span>Confirm password</span><input required type="password" minLength="12" maxLength="128" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label>
+      {error && <div className="loginError" role="alert">{error}</div>}
+      <button className="loginSubmit" disabled={loading}>{loading ? "Creating company…" : "Create company account"}</button>
+    </form>
+    <button className="authSwitch" type="button" onClick={onShowLogin}>Back to sign in</button>
+  </section></main>;
+}
+
+function CompanyPortal({ user, onLogout }) {
+  const [dashboard, setDashboard] = useState(null);
+  const [options, setOptions] = useState({ developers: [], problems: [] });
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
+  const [duration, setDuration] = useState("60");
+  const [problemIds, setProblemIds] = useState([]);
+  const [developerIds, setDeveloperIds] = useState([]);
+  const [participants, setParticipants] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    try {
+      const [d, o] = await Promise.all([request("/api/company/dashboard"), request("/api/company/options")]);
+      setDashboard(d); setOptions(o); setError("");
+    } catch (err) { setError(err.message || "Unable to load company dashboard."); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function toggle(setter, current, id) {
+    setter(current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
+  }
+  async function createAssessment(event) {
+    event.preventDefault(); setBusy(true); setError(""); setNotice("");
+    try {
+      await request("/api/company/assessments", { method: "POST", body: JSON.stringify({
+        title, description, start_at: new Date(startAt).toISOString(), end_at: new Date(endAt).toISOString(),
+        duration_minutes: Number(duration), problem_ids: problemIds, developer_ids: developerIds
+      })});
+      setNotice("Assessment created and selected developers assigned.");
+      setShowForm(false); setTitle(""); setDescription(""); setProblemIds([]); setDeveloperIds([]);
+      await load();
+    } catch (err) { setError(err.message || "Could not create assessment."); }
+    finally { setBusy(false); }
+  }
+  async function viewParticipants(id) {
+    try { const result = await request(`/api/company/assessments/${id}/participants`); setParticipants({ id, ...result }); }
+    catch (err) { setError(err.message); }
+  }
+  return <main className="userLayout" data-theme="dark"><div className="userMain">
+    <header className="userTopbar"><div><div className="eyebrow">COMPANY WORKSPACE</div><h1>Assessment Management</h1><p>{user.username}</p></div><button className="ghost" onClick={onLogout}>Sign out</button></header>
+    <div className="userPageContent">
+      {error && <div className="userError" role="alert">{error}</div>}
+      {notice && <div className="loginSuccess" role="status">{notice}</div>}
+      <div className="moduleHeader"><div><h2>Company dashboard</h2><p>Manage assessments, assigned developers and performance.</p></div><button className="primary" onClick={() => setShowForm(value => !value)}>＋ Create assessment</button></div>
+      {dashboard && <div className="userStatsGrid">
+        <UserStat label="Total assessments" value={dashboard.total_assessments} icon="▣" />
+        <UserStat label="Active" value={dashboard.active_assessments} icon="◉" />
+        <UserStat label="Upcoming" value={dashboard.upcoming_assessments} icon="◷" />
+        <UserStat label="Completed" value={dashboard.completed_assessments} icon="✓" />
+        <UserStat label="Assigned developers" value={dashboard.assigned_developers} icon="♙" />
+        <UserStat label="Average score" value={dashboard.average_score ?? "—"} icon="%" />
+        <UserStat label="Completion rate" value={`${dashboard.completion_rate}%`} icon="↗" />
+      </div>}
+      {dashboard?.assessment_analytics?.length > 0 && <div className="userTwoColumns">
+        <section className="userPanel"><SectionTitle title="Participants by assessment" subtitle="Developer assignments across your assessments." /><div style={{ height: 250 }}>
+          <ResponsiveContainer width="100%" height="100%"><BarChart data={dashboard.assessment_analytics}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="title" tick={{ fontSize: 9 }} /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="participants" fill="#526fe5" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer>
+        </div></section>
+        <section className="userPanel"><SectionTitle title="Average assessment score" subtitle="Based on scores recorded in assessment participation." /><div style={{ height: 250 }}>
+          <ResponsiveContainer width="100%" height="100%"><BarChart data={dashboard.assessment_analytics}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="title" tick={{ fontSize: 9 }} /><YAxis /><Tooltip /><Bar dataKey="average_score" fill="#2bbf9b" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer>
+        </div></section>
+      </div>}
+      {showForm && <section className="userPanel">
+        <SectionTitle title="Create assessment" subtitle="Choose problems, schedule the assessment and assign developers." />
+        <form className="profileEditForm companyAssessmentForm" onSubmit={createAssessment}>
+          <label className="loginField"><span>Assessment title</span><input required minLength="2" maxLength="160" value={title} onChange={e => setTitle(e.target.value)} /></label>
+          <label className="loginField"><span>Description</span><textarea rows="3" value={description} onChange={e => setDescription(e.target.value)} /></label>
+          <div className="userTwoColumns">
+            <label className="loginField"><span>Start date and time</span><input required type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)} /></label>
+            <label className="loginField"><span>End date and time</span><input required type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} /></label>
+          </div>
+          <label className="loginField"><span>Duration (minutes)</span><input required type="number" min="1" max="1440" value={duration} onChange={e => setDuration(e.target.value)} /></label>
+          <h3>Programming problems ({problemIds.length} selected)</h3>
+          <div className="selectionList">{options.problems.map(problem => <label key={problem.id}><input type="checkbox" checked={problemIds.includes(problem.id)} onChange={() => toggle(setProblemIds, problemIds, problem.id)} /> {problem.title} <small>#{problem.id}</small></label>)}</div>
+          <h3>Assign developers ({developerIds.length} selected)</h3>
+          <div className="selectionList">{options.developers.map(dev => <label key={dev.id}><input type="checkbox" checked={developerIds.includes(dev.id)} onChange={() => toggle(setDeveloperIds, developerIds, dev.id)} /> {dev.name} <small>#{dev.id}</small></label>)}</div>
+          <div className="modalFoot"><button type="button" className="ghost" onClick={() => setShowForm(false)}>Cancel</button><button className="primary" disabled={busy || !problemIds.length || !developerIds.length}>{busy ? "Creating…" : "Create and assign"}</button></div>
+        </form>
+      </section>}
+      <section className="userPanel">
+        <SectionTitle title="Your assessments" subtitle="Only assessments owned by this company are shown." />
+        {dashboard?.assessments?.length ? <div className="userTableScroll"><table className="userTable"><thead><tr><th>ID</th><th>Assessment</th><th>Start</th><th>End</th><th>Actions</th></tr></thead><tbody>
+          {dashboard.assessments.map(item => <tr key={item.assessment_id || item.id}><td>{item.assessment_id || item.id}</td><td>{item.title || item.assessment_name || item.name}</td><td>{item.start_at || item.start_time || item.start_date || "—"}</td><td>{item.end_at || item.end_time || item.end_date || "—"}</td><td><button className="ghost" onClick={() => viewParticipants(item.assessment_id || item.id)}>Participants</button></td></tr>)}
+        </tbody></table></div> : <p>No assessments created yet.</p>}
+      </section>
+      {participants && <section className="userPanel"><SectionTitle title={`Participants for assessment #${participants.id}`} /><div className="userTableScroll"><table className="userTable"><thead><tr>{Object.keys(participants.items[0] || {}).map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{participants.items.map((row, index) => <tr key={index}>{Object.values(row).map((value, i) => <td key={i}>{value == null ? "—" : String(value)}</td>)}</tr>)}</tbody></table></div></section>}
+      <button className="ghost" onClick={load}>↻ Refresh dashboard</button>
+    </div>
+  </div></main>;
 }
 
 function DashboardApp({ admin, onLogout }) {

@@ -19,7 +19,7 @@ The dark main dashboard includes date, country, difficulty, and language filters
 - PostgreSQL database with your existing schema
 
 ## Authentication and developer platform
-The application has one administrator account configured with `ADMIN_USERNAME` and `ADMIN_PASSWORD`; administrator accounts cannot be created through the public UI. The development/demo defaults are username `admin` and password `admin`; change both before deployment. Developers can create their own accounts, but they cannot access administrator CRUD, analytics, or SQL APIs.
+The application has one administrator account configured with `ADMIN_USERNAME` and `ADMIN_PASSWORD`; administrator accounts cannot be created through the public UI. Companies can register using the Company Portal and receive a separate `company` JWT role. The development/demo defaults are username `admin` and password `admin`; change both before deployment. Developers can create their own accounts, but they cannot access administrator CRUD, analytics, or SQL APIs.
 
 The backend signs short-lived HS256 bearer tokens using `AUTH_SECRET`. Set it to a randomly generated secret of at least 32 characters; for example, in PowerShell:
 
@@ -29,7 +29,7 @@ py -c "import secrets; print(secrets.token_urlsafe(48))"
 
 The frontend stores the bearer token in `sessionStorage`, which limits its lifetime to the browser tab session but remains accessible to JavaScript. Use HTTPS in deployment and do not treat demo credentials or a frontend token as production-grade secret storage.
 
-Developer passwords are stored as PBKDF2 hashes in a separate `developer_auth_accounts` table. Before enabling the platform on an existing database, apply any migrations in `backend/migrations` that have not already been applied, in numeric order, using pgAdmin or `psql`. Do not rerun migrations `003_user_platform_relations.sql` or `005_pending_submissions.sql`. The app does not create or alter the schema automatically. The auth table is hidden from the management tables and unavailable in the SQL query tool.
+Developer passwords are stored as PBKDF2 hashes in a separate `developer_auth_accounts` table. Before enabling the platform on an existing database, apply any migrations in `backend/migrations` that have not already been applied, in numeric order, using pgAdmin or `psql`. Do not rerun migrations already applied, including `003_user_platform_relations.sql` and `005_pending_submissions.sql`. Apply `006_company_auth_accounts.sql` once to enable company login. The app does not create or alter the schema automatically. The auth table is hidden from the management tables and unavailable in the SQL query tool.
 
 The developer platform reads the existing developer, problem, tag, solve, submission, language, and contest records. Each account is linked to one developer profile. Developers can browse and filter problems, see public (non-hidden) examples, review only their own submissions and statistics, update their display name/country, join upcoming contests, and view an aggregate leaderboard. Submitting code only stores it with `PENDING` status: **this project has no code execution or judging service**, and a saved submission does not mark a problem solved.
 
@@ -46,7 +46,7 @@ Developer platform endpoints (developer token required):
 - `GET /api/user/dashboard`, `/api/user/activity`, `/api/user/analytics`, and `/api/user/profile`; `PATCH /api/user/profile` — personal data and profile.
 - `GET /api/leaderboard`, `GET /api/contests`, and `POST /api/contests/{contest_id}/join`.
 
-Administrator management APIs require an admin token; developer APIs require a developer token. `GET /api/health`, login, and developer signup are public.
+Administrator management APIs require an admin token; developer APIs require a developer token; `/api/company/*` endpoints require a company token. `GET /api/health`, login, developer signup, and company signup are public.\n\nCompany portal endpoints:\n- `POST /api/auth/company-signup` — creates a company profile and linked password account.\n- `GET /api/company/me` and `GET /api/company/dashboard` — company profile and company-owned assessment metrics.\n- `GET /api/company/options` — available developers and programming problems for assignment.\n- `POST /api/company/assessments` — creates an assessment, links selected problems, and assigns selected developers.\n- `GET /api/company/assessments/{assessment_id}/participants` — lists participants for an assessment owned by the signed-in company.
 
 ## 1. Configure backend
 Open PowerShell in the project folder:

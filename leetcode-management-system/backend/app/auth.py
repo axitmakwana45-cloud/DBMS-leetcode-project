@@ -17,6 +17,7 @@ from .database import engine
 load_dotenv()
 
 DEVELOPER_AUTH_TABLE = "developer_auth_accounts"
+COMPANY_AUTH_TABLE = "company_auth_accounts"
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 AUTH_SECRET = os.getenv("AUTH_SECRET", "")
@@ -33,6 +34,16 @@ if AUTH_TOKEN_TTL < 1:
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 developer_router = APIRouter(prefix="/api/developer", tags=["developer"])
 auth_metadata = MetaData()
+companies = Table("company", auth_metadata, Column("company_id", Integer, primary_key=True))
+company_accounts = Table(
+    COMPANY_AUTH_TABLE,
+    auth_metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("email", String(254), nullable=False, unique=True),
+    Column("password_hash", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("company_id", Integer, ForeignKey("company.company_id", ondelete="CASCADE"), nullable=False, unique=True),
+)
 developer_accounts = Table(
     DEVELOPER_AUTH_TABLE,
     auth_metadata,
@@ -61,6 +72,31 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class CompanySignupRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    company_name: str = Field(min_length=2, max_length=120)
+    industry: str = Field(min_length=2, max_length=100)
+    website: str = Field(default="", max_length=255)
+    location: str = Field(default="", max_length=160)
+    password: str = Field(min_length=12, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_company_email(cls, value):
+        username = value.strip().lower()
+        if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", username):
+            raise ValueError("Enter a valid company email address.")
+        return username
+
+    @field_validator("company_name", "industry")
+    @classmethod
+    def trim_company_fields(cls, value):
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("This field cannot be empty.")
+        return normalized
+
+
 class SignupRequest(BaseModel):
     username: str = Field(min_length=3, max_length=254)
     full_name: str = Field(min_length=1, max_length=100)
@@ -85,7 +121,7 @@ class SignupRequest(BaseModel):
         return normalized
 
 
-def create_access_token(username, role, developer_id=None):
+def create_access_token(username, role, developer_id=None, company_id=None):
     now = datetime.now(timezone.utc)
     claims = {
         "sub": username,
@@ -95,6 +131,8 @@ def create_access_token(username, role, developer_id=None):
     }
     if developer_id is not None:
         claims["developer_id"] = developer_id
+    if company_id is not None:
+        claims["company_id"] = company_id
     return jwt.encode(claims, AUTH_SECRET, algorithm="HS256")
 
 
@@ -129,33 +167,37 @@ def account_identity(username, role):
 
 @router.post("/login")
 def login(credentials: LoginRequest):
-    username_valid = secrets.compare_digest(credentials.username.encode("utf-8"), ADMIN_USERNAME.encode("utf-8"))
-    if username_valid:
-        password_valid = secrets.compare_digest(credentials.password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8"))
-        if not password_valid:
+    username = credentials.username.strip()
+    if secrets.compare_digest(username.encode("utf-8"), ADMIN_USERNAME.encode("utf-8")):
+        if not secrets.compare_digest(credentials.password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8")):
             raise HTTPException(status_code=401, detail="Invalid username or password.")
-        username, role, developer_id = ADMIN_USERNAME, "admin", None
+        role, developer_id, company_id = "admin", None, None
     else:
+        normalized = username.lower()
         try:
             with engine.connect() as conn:
-                account = conn.execute(
-                    select(
-                        developer_accounts.c.username,
-                        developer_accounts.c.password_hash,
-                        developer_accounts.c.developer_id,
-                    ).where(
-                        developer_accounts.c.username == credentials.username.strip().lower()
-                    )
+                developer = conn.execute(
+                    select(developer_accounts.c.username, developer_accounts.c.password_hash, developer_accounts.c.developer_id)
+                    .where(developer_accounts.c.username == normalized)
                 ).mappings().first()
+                if developer and verify_password(credentials.password, developer["password_hash"]):
+                    username, role, developer_id, company_id = developer["username"], "developer", developer["developer_id"], None
+                else:
+                    company = conn.execute(
+                        select(company_accounts.c.email, company_accounts.c.password_hash, company_accounts.c.company_id)
+                        .where(company_accounts.c.email == normalized)
+                    ).mappings().first()
+                    if not company or not verify_password(credentials.password, company["password_hash"]):
+                        raise HTTPException(status_code=401, detail="Invalid username or password.")
+                    username, role, developer_id, company_id = company["email"], "company", None, company["company_id"]
         except SQLAlchemyError as exc:
-            developer_accounts_unavailable(exc)
-        if account is None or not verify_password(credentials.password, account["password_hash"]):
-            raise HTTPException(status_code=401, detail="Invalid username or password.")
-        username, role, developer_id = account["username"], "developer", account["developer_id"]
+            raise HTTPException(status_code=503, detail="Account tables are not initialized. Apply the required database migrations.") from exc
 
     identity = account_identity(username, role)
+    if role == "company":
+        identity["company_id"] = company_id
     result = {
-        "access_token": create_access_token(username, role, developer_id),
+        "access_token": create_access_token(username, role, developer_id, company_id),
         "token_type": "bearer",
         "user": identity,
     }
@@ -198,6 +240,45 @@ def signup(credentials: SignupRequest):
         developer_accounts_unavailable(exc)
 
     return {"message": "Developer account created.", "developer": account_identity(username, "developer")}
+
+
+@router.post("/company-signup", status_code=status.HTTP_201_CREATED)
+def company_signup(credentials: CompanySignupRequest):
+    from .database import refresh_metadata
+
+    try:
+        company_table = refresh_metadata().tables.get("company")
+        if company_table is None:
+            raise HTTPException(status_code=503, detail="The existing company table was not found.")
+        company_id_col = next((company_table.c[name] for name in ("company_id", "id") if name in company_table.c), None)
+        if company_id_col is None:
+            raise HTTPException(status_code=503, detail="The company table needs a company_id primary key.")
+        values = {}
+        for candidates, value in [
+            (("name", "company_name"), credentials.company_name),
+            (("industry", "sector", "company_type"), credentials.industry),
+            (("email", "contact_email"), credentials.email),
+            (("website", "website_url"), credentials.website or None),
+            (("location", "headquarters", "city"), credentials.location or None),
+        ]:
+            target = next((company_table.c[name] for name in candidates if name in company_table.c), None)
+            if target is not None:
+                values[target.name] = value
+        missing = [column.name for column in company_table.columns if not column.nullable and column.default is None and column.server_default is None and not column.primary_key and column.name not in values]
+        if missing:
+            raise HTTPException(status_code=422, detail=f"Company profile needs additional required fields: {missing}")
+        with engine.begin() as conn:
+            company_id = conn.execute(insert(company_table).values(**values).returning(company_id_col)).scalar_one()
+            conn.execute(insert(company_accounts).values(
+                email=credentials.email,
+                password_hash=password_hash(credentials.password),
+                company_id=company_id,
+            ))
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="A company account with this email or company identity already exists.") from exc
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Company account setup failed. Check the company table schema and apply migration 006.") from exc
+    return {"message": "Company account created. You can now sign in.", "company": {"email": credentials.email, "role": "company", "company_id": company_id}}
 
 
 @router.get("/me")
@@ -260,11 +341,15 @@ def decode_access_token(token: str):
 
     username = claims["sub"]
     role = claims["role"]
-    if not isinstance(username, str) or role not in {"admin", "developer"}:
+    if not isinstance(username, str) or role not in {"admin", "developer", "company"}:
         raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
     if role == "admin" and username != ADMIN_USERNAME:
         raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
     developer_id = claims.get("developer_id")
+    if role == "company":
+        company_id = claims.get("company_id")
+        if not isinstance(company_id, int) or company_id < 1:
+            raise HTTPException(status_code=401, detail="Invalid or expired authentication token.")
     if role == "developer" and (
         username.casefold() == ADMIN_USERNAME.casefold()
         or not isinstance(developer_id, int)
@@ -274,4 +359,6 @@ def decode_access_token(token: str):
     identity = account_identity(username, role)
     if developer_id is not None:
         identity["developer_id"] = developer_id
+    if role == "company":
+        identity["company_id"] = claims["company_id"]
     return identity
