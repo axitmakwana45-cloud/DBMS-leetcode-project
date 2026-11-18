@@ -95,6 +95,8 @@ export default function App() {
         email: profile.email,
         company_name: profile.companyName,
         industry: profile.industry,
+        website: profile.website,
+        location: profile.location,
         password,
       } : {
         username: profile.email,
@@ -269,6 +271,8 @@ function CompanySignup({ onSignup, onShowLogin }) {
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("");
+  const [website, setWebsite] = useState("");
+  const [location, setLocation] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -279,7 +283,7 @@ function CompanySignup({ onSignup, onShowLogin }) {
     if (password !== confirmPassword) return setError("Passwords do not match.");
     setLoading(true);
     try {
-      await onSignup({ email: email.trim().toLowerCase(), companyName: companyName.trim(), industry: industry.trim() }, password);
+      await onSignup({ email: email.trim().toLowerCase(), companyName: companyName.trim(), industry: industry.trim(), website: website.trim(), location: location.trim() }, password);
     } catch (err) {
       setError(err.message || "Unable to create company account.");
     } finally { setLoading(false); }
@@ -291,6 +295,8 @@ function CompanySignup({ onSignup, onShowLogin }) {
       <label className="loginField"><span>Company name</span><input required minLength="2" maxLength="120" value={companyName} onChange={e => setCompanyName(e.target.value)} /></label>
       <label className="loginField"><span>Work email</span><input required type="email" maxLength="254" value={email} onChange={e => setEmail(e.target.value)} /></label>
       <label className="loginField"><span>Industry</span><input required minLength="2" maxLength="100" placeholder="e.g. Software / IT" value={industry} onChange={e => setIndustry(e.target.value)} /></label>
+      <label className="loginField"><span>Website (optional)</span><input type="url" maxLength="255" value={website} onChange={e => setWebsite(e.target.value)} /></label>
+      <label className="loginField"><span>Headquarters / Location (optional)</span><input maxLength="160" value={location} onChange={e => setLocation(e.target.value)} /></label>
       <label className="loginField"><span>Password (minimum 12 characters)</span><input required type="password" minLength="12" maxLength="128" value={password} onChange={e => setPassword(e.target.value)} /></label>
       <label className="loginField"><span>Confirm password</span><input required type="password" minLength="12" maxLength="128" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label>
       {error && <div className="loginError" role="alert">{error}</div>}
