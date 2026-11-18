@@ -937,7 +937,7 @@ def validate_read_only_sql(sql: str, limit: int = 100):
 
     normalized = re.sub(r"\s+", " ", cleaned).upper()
     without_comments = re.sub(r"/\*.*?\*/|--[^\r\n]*", "", cleaned, flags=re.DOTALL).upper()
-    if DEVELOPER_AUTH_TABLE.upper() in without_comments:
+    if any(table_name.upper() in without_comments for table_name in (DEVELOPER_AUTH_TABLE, COMPANY_AUTH_TABLE)):
         raise ValueError("Authentication tables are not available in the custom SQL tool.")
     disallowed = [
         "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE",
