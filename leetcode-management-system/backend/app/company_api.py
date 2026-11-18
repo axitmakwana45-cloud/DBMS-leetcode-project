@@ -180,9 +180,9 @@ def create_assessment(payload: AssessmentCreate, request: Request):
                 ap_problem = col(assessment_problem, "problem_id")
                 if ap_assessment is None or ap_problem is None:
                     raise HTTPException(status_code=503, detail="assessment_problem must contain assessment_id and problem_id.")
-                for problem_id in dict.fromkeys(payload.problem_ids):
+                for sequence_number, problem_id in enumerate(dict.fromkeys(payload.problem_ids), start=1):
                     link_values = {ap_assessment.name: assessment_id, ap_problem.name: problem_id}
-                    add_if_present(assessment_problem, ("sequence_no", "sequence_number", "position", "order_no"), len(link_values), link_values)
+                    add_if_present(assessment_problem, ("sequence_no", "sequence_number", "position", "order_no"), sequence_number, link_values)
                     conn.execute(insert(assessment_problem).values(**link_values))
             if payload.developer_ids:
                 participation = table_named(all_tables, "assessment_participation")
