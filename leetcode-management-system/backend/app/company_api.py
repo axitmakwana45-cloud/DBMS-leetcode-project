@@ -115,6 +115,19 @@ def company_dashboard(request: Request):
         unique_developers = {row.get(developer_fk.name) for row in participant_rows if developer_fk is not None and row.get(developer_fk.name) is not None}
         scores = [float(row[score_col.name]) for row in participant_rows if score_col is not None and row.get(score_col.name) is not None]
         completed_participants = sum(1 for row in participant_rows if status_col is not None and str(row.get(status_col.name, "")).upper() in {"SUBMITTED", "COMPLETED", "EVALUATED", "ACCEPTED"})
+        assessment_analytics = []
+        for assessment_row in owned:
+            assessment_id = assessment_row[assessment_pk.name]
+            linked = [row for row in participant_rows if assessment_fk is not None and row.get(assessment_fk.name) == assessment_id]
+            linked_scores = [float(row[score_col.name]) for row in linked if score_col is not None and row.get(score_col.name) is not None]
+            assessment_title = next((assessment_row.get(name) for name in ("title", "assessment_name", "name") if assessment_row.get(name) is not None), f"Assessment {assessment_id}")
+            assessment_analytics.append({
+                "assessment_id": assessment_id,
+                "title": str(assessment_title),
+                "participants": len(linked),
+                "average_score": round(sum(linked_scores) / len(linked_scores), 2) if linked_scores else None,
+                "completed": sum(1 for row in linked if status_col is not None and str(row.get(status_col.name, "")).upper() in {"SUBMITTED", "COMPLETED", "EVALUATED", "ACCEPTED"}),
+            })
         return {
             "total_assessments": len(owned),
             "active_assessments": active,
@@ -125,6 +138,7 @@ def company_dashboard(request: Request):
             "average_score": round(sum(scores) / len(scores), 2) if scores else None,
             "completion_rate": round(100 * completed_participants / len(participant_rows), 2) if participant_rows else 0,
             "assessments": [dict(row) for row in owned],
+            "assessment_analytics": assessment_analytics,
         }
 
 
