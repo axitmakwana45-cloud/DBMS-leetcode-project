@@ -344,7 +344,7 @@ function CompanyPortal({ user, onLogout }) {
     try { const result = await request(`/api/company/assessments/${id}/participants`); setParticipants({ id, ...result }); }
     catch (err) { setError(err.message); }
   }
-  return <main className="userApp">
+  return <main className="userLayout" data-theme="dark"><div className="userMain">
     <header className="userTopbar"><div><div className="eyebrow">COMPANY WORKSPACE</div><h1>Assessment Management</h1><p>{user.username}</p></div><button className="ghost" onClick={onLogout}>Sign out</button></header>
     <div className="userPageContent">
       {error && <div className="userError" role="alert">{error}</div>}
@@ -361,7 +361,7 @@ function CompanyPortal({ user, onLogout }) {
       </div>}
       {showForm && <section className="userPanel">
         <SectionTitle title="Create assessment" subtitle="Choose problems, schedule the assessment and assign developers." />
-        <form className="profileEditForm" onSubmit={createAssessment}>
+        <form className="profileEditForm companyAssessmentForm" onSubmit={createAssessment}>
           <label className="loginField"><span>Assessment title</span><input required minLength="2" maxLength="160" value={title} onChange={e => setTitle(e.target.value)} /></label>
           <label className="loginField"><span>Description</span><textarea rows="3" value={description} onChange={e => setDescription(e.target.value)} /></label>
           <div className="userTwoColumns">
@@ -385,7 +385,7 @@ function CompanyPortal({ user, onLogout }) {
       {participants && <section className="userPanel"><SectionTitle title={`Participants for assessment #${participants.id}`} /><div className="userTableScroll"><table className="userTable"><thead><tr>{Object.keys(participants.items[0] || {}).map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{participants.items.map((row, index) => <tr key={index}>{Object.values(row).map((value, i) => <td key={i}>{value == null ? "—" : String(value)}</td>)}</tr>)}</tbody></table></div></section>}
       <button className="ghost" onClick={load}>↻ Refresh dashboard</button>
     </div>
-  </main>;
+  </div></main>;
 }
 
 function DashboardApp({ admin, onLogout }) {
