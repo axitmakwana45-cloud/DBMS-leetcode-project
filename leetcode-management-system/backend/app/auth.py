@@ -261,11 +261,26 @@ def company_signup(credentials: CompanySignupRequest):
             (("email", "contact_email"), credentials.email),
             (("website", "website_url"), credentials.website or None),
             (("location", "headquarters", "city"), credentials.location or None),
-            (("country",), credentials.country),
         ]:
             target = next((company_table.c[name] for name in candidates if name in company_table.c), None)
             if target is not None:
                 values[target.name] = value
+
+        # Resolve Country explicitly from the reflected company table. This keeps
+        # the required profile field mapped even if SQLAlchemy column keys differ
+        # from their displayed database column names.
+        country_column = next(
+            (
+                column
+                for column in company_table.columns
+                if column.name.strip().casefold() == "country"
+                or str(column.key).strip().casefold() == "country"
+            ),
+            None,
+        )
+        if country_column is not None:
+            values[country_column.name] = credentials.country.strip()
+
         missing = [column.name for column in company_table.columns if not column.nullable and column.default is None and column.server_default is None and not column.primary_key and column.name not in values]
         if missing:
             raise HTTPException(status_code=422, detail=f"Company profile needs additional required fields: {missing}")
