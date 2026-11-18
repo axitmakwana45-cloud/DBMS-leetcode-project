@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, Table, func, insert, select
+from sqlalchemy import insert, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .database import engine, refresh_metadata
@@ -96,6 +96,10 @@ def company_dashboard(request: Request):
             for name in names:
                 value = row.get(name)
                 if value is not None:
+                    if isinstance(value, datetime) and value.tzinfo is None:
+                        return value.replace(tzinfo=timezone.utc)
+                    if isinstance(value, date) and not isinstance(value, datetime):
+                        return datetime.combine(value, time.min, tzinfo=timezone.utc)
                     return value
             return None
         active = upcoming = completed = 0
@@ -163,7 +167,6 @@ def create_assessment(payload: AssessmentCreate, request: Request):
     add_if_present(assessment, ("start_at", "start_time", "start_date"), payload.start_at, values)
     add_if_present(assessment, ("end_at", "end_time", "end_date", "deadline"), payload.end_at, values)
     add_if_present(assessment, ("duration_minutes", "duration"), payload.duration_minutes, values)
-    add_if_present(assessment, ("status"), "SCHEDULED", values)
     add_if_present(assessment, ("created_at", "created_on"), datetime.now(timezone.utc), values)
     missing = [column.name for column in assessment.columns if not column.nullable and column.default is None and column.server_default is None and not column.primary_key and column.name not in values]
     if missing:
@@ -187,7 +190,6 @@ def create_assessment(payload: AssessmentCreate, request: Request):
                     raise HTTPException(status_code=503, detail="assessment_participation must contain assessment_id and developer_id.")
                 for developer_id in dict.fromkeys(payload.developer_ids):
                     part_values = {part_assessment.name: assessment_id, part_developer.name: developer_id}
-                    add_if_present(participation, ("status"), "ASSIGNED", part_values)
                     add_if_present(participation, ("assigned_at", "created_at"), datetime.now(timezone.utc), part_values)
                     conn.execute(insert(participation).values(**part_values))
     except IntegrityError as exc:
