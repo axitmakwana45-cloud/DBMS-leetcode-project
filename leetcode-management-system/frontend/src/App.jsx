@@ -97,6 +97,7 @@ export default function App() {
         industry: profile.industry,
         website: profile.website,
         location: profile.location,
+        country: profile.country,
         password,
       } : {
         username: profile.email,
