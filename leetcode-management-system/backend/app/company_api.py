@@ -18,7 +18,7 @@ class AssessmentCreate(BaseModel):
     end_at: datetime
     duration_minutes: int = Field(ge=1, le=1440)
     problem_ids: list[int] = Field(default_factory=list, max_length=100)
-    developer_ids: list[int] = Field(default_factory=list, max_length=500)
+    developer_ids: list[int] = Field(min_length=1, max_length=500)
 
 
 def tables():
@@ -181,7 +181,9 @@ def create_assessment(payload: AssessmentCreate, request: Request):
                 if ap_assessment is None or ap_problem is None:
                     raise HTTPException(status_code=503, detail="assessment_problem must contain assessment_id and problem_id.")
                 for problem_id in dict.fromkeys(payload.problem_ids):
-                    conn.execute(insert(assessment_problem).values({ap_assessment.name: assessment_id, ap_problem.name: problem_id}))
+                    link_values = {ap_assessment.name: assessment_id, ap_problem.name: problem_id}
+                    add_if_present(assessment_problem, ("sequence_no", "sequence_number", "position", "order_no"), len(link_values), link_values)
+                    conn.execute(insert(assessment_problem).values(**link_values))
             if payload.developer_ids:
                 participation = table_named(all_tables, "assessment_participation")
                 part_assessment = col(participation, "assessment_id")
