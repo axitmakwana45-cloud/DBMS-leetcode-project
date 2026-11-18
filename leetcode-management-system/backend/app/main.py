@@ -69,7 +69,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PUBLIC_API_PATHS = {"/api/health", "/api/auth/login", "/api/auth/signup"}
+PUBLIC_API_PATHS = {"/api/health", "/api/auth/login", "/api/auth/signup", "/api/auth/company-signup"}
 
 
 @app.middleware("http")
