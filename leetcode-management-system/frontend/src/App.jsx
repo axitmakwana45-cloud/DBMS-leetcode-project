@@ -365,6 +365,14 @@ function CompanyPortal({ user, onLogout }) {
         <UserStat label="Average score" value={dashboard.average_score ?? "—"} icon="%" />
         <UserStat label="Completion rate" value={`${dashboard.completion_rate}%`} icon="↗" />
       </div>}
+      {dashboard?.assessment_analytics?.length > 0 && <div className="userTwoColumns">
+        <section className="userPanel"><SectionTitle title="Participants by assessment" subtitle="Developer assignments across your assessments." /><div style={{ height: 250 }}>
+          <ResponsiveContainer width="100%" height="100%"><BarChart data={dashboard.assessment_analytics}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="title" tick={{ fontSize: 9 }} /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="participants" fill="#526fe5" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer>
+        </div></section>
+        <section className="userPanel"><SectionTitle title="Average assessment score" subtitle="Based on scores recorded in assessment participation." /><div style={{ height: 250 }}>
+          <ResponsiveContainer width="100%" height="100%"><BarChart data={dashboard.assessment_analytics}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="title" tick={{ fontSize: 9 }} /><YAxis /><Tooltip /><Bar dataKey="average_score" fill="#2bbf9b" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer>
+        </div></section>
+      </div>}
       {showForm && <section className="userPanel">
         <SectionTitle title="Create assessment" subtitle="Choose problems, schedule the assessment and assign developers." />
         <form className="profileEditForm companyAssessmentForm" onSubmit={createAssessment}>
