@@ -264,6 +264,9 @@ def company_signup(credentials: CompanySignupRequest):
             target = next((company_table.c[name] for name in candidates if name in company_table.c), None)
             if target is not None:
                 values[target.name] = value
+        missing = [column.name for column in company_table.columns if not column.nullable and column.default is None and column.server_default is None and not column.primary_key and column.name not in values]
+        if missing:
+            raise HTTPException(status_code=422, detail=f"Company profile needs additional required fields: {missing}")
         with engine.begin() as conn:
             company_id = conn.execute(insert(company_table).values(**values).returning(company_id_col)).scalar_one()
             conn.execute(insert(company_accounts).values(
