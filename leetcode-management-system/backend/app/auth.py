@@ -78,6 +78,7 @@ class CompanySignupRequest(BaseModel):
     industry: str = Field(min_length=2, max_length=100)
     website: str = Field(default="", max_length=255)
     location: str = Field(default="", max_length=160)
+    country: str = Field(min_length=2, max_length=60)
     password: str = Field(min_length=12, max_length=128)
 
     @field_validator("email")
@@ -260,6 +261,7 @@ def company_signup(credentials: CompanySignupRequest):
             (("email", "contact_email"), credentials.email),
             (("website", "website_url"), credentials.website or None),
             (("location", "headquarters", "city"), credentials.location or None),
+            (("country",), credentials.country),
         ]:
             target = next((company_table.c[name] for name in candidates if name in company_table.c), None)
             if target is not None:
