@@ -85,7 +85,7 @@ class CompanySignupRequest(BaseModel):
     @classmethod
     def normalize_company_email(cls, value):
         username = value.strip().lower()
-        if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", username):
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", username):
             raise ValueError("Enter a valid company email address.")
         return username
 
@@ -292,7 +292,11 @@ def company_signup(credentials: CompanySignupRequest):
                 company_id=company_id,
             ))
     except IntegrityError as exc:
-        raise HTTPException(status_code=409, detail="A company account with this email or company identity already exists.") from exc
+        print("COMPANY SIGNUP DATABASE ERROR:", repr(exc.orig))
+        raise HTTPException(
+            status_code=409,
+            detail=f"Database integrity error: {str(exc.orig)}"
+        ) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=503, detail="Company account setup failed. Check the company table schema and apply migration 006.") from exc
     return {"message": "Company account created. You can now sign in.", "company": {"email": credentials.email, "role": "company", "company_id": company_id}}

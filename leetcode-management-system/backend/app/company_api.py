@@ -17,6 +17,7 @@ class AssessmentCreate(BaseModel):
     start_at: datetime
     end_at: datetime
     duration_minutes: int = Field(ge=1, le=1440)
+    total_marks: int = Field(ge=1)
     problem_ids: list[int] = Field(default_factory=list, max_length=100)
     developer_ids: list[int] = Field(min_length=1, max_length=500)
 
@@ -182,6 +183,7 @@ def create_assessment(payload: AssessmentCreate, request: Request):
     add_if_present(assessment, ("start_at", "start_time", "start_date"), payload.start_at, values)
     add_if_present(assessment, ("end_at", "end_time", "end_date", "deadline"), payload.end_at, values)
     add_if_present(assessment, ("duration_minutes", "duration"), payload.duration_minutes, values)
+    add_if_present(assessment, ("total_marks",), payload.total_marks, values)
     add_if_present(assessment, ("created_at", "created_on"), datetime.now(timezone.utc), values)
     missing = [column.name for column in assessment.columns if not column.nullable and column.default is None and column.server_default is None and not column.primary_key and column.name not in values]
     if missing:
@@ -198,8 +200,22 @@ def create_assessment(payload: AssessmentCreate, request: Request):
                 if ap_assessment is None or ap_problem is None:
                     raise HTTPException(status_code=503, detail="assessment_problem must contain assessment_id and problem_id.")
                 for sequence_number, problem_id in enumerate(dict.fromkeys(payload.problem_ids), start=1):
-                    link_values = {ap_assessment.name: assessment_id, ap_problem.name: problem_id}
-                    add_if_present(assessment_problem, ("sequence_no", "sequence_number", "position", "order_no"), sequence_number, link_values)
+                    link_values = {
+                        ap_assessment.name: assessment_id,
+                        ap_problem.name: problem_id,
+                    }
+                    add_if_present(
+                        assessment_problem,
+                        ("sequence_no", "sequence_number", "problem_order", "position", "order_no"),
+                        sequence_number,
+                        link_values,
+                    )
+                    add_if_present(
+                        assessment_problem,
+                        ("points",),
+                        10,
+                        link_values,
+                    )
                     conn.execute(insert(assessment_problem).values(**link_values))
             if payload.developer_ids:
                 participation = table_named(all_tables, "assessment_participation")
@@ -208,11 +224,29 @@ def create_assessment(payload: AssessmentCreate, request: Request):
                 if participation is None or part_assessment is None or part_developer is None:
                     raise HTTPException(status_code=503, detail="assessment_participation must contain assessment_id and developer_id.")
                 for developer_id in dict.fromkeys(payload.developer_ids):
-                    part_values = {part_assessment.name: assessment_id, part_developer.name: developer_id}
-                    add_if_present(participation, ("assigned_at", "created_at"), datetime.now(timezone.utc), part_values)
+                    part_values = {
+                        part_assessment.name: assessment_id,
+                        part_developer.name: developer_id,
+                    }
+                    add_if_present(
+                        participation,
+                        ("status",),
+                        "REGISTERED",
+                        part_values,
+                    )
+                    add_if_present(
+                        participation,
+                        ("assigned_at", "created_at"),
+                        datetime.now(timezone.utc),
+                        part_values,
+                    )
                     conn.execute(insert(participation).values(**part_values))
     except IntegrityError as exc:
-        raise HTTPException(status_code=409, detail="Assessment assignment conflicts with an existing database constraint or selected ID.") from exc
+        print("ASSESSMENT INTEGRITY ERROR:", repr(exc.orig))
+        raise HTTPException(
+            status_code=409,
+            detail=f"Assessment database error: {str(exc.orig)}"
+        ) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=400, detail=f"Could not create assessment: {getattr(exc, 'orig', exc)}") from exc
     return {"message": "Assessment created and assignments saved.", "assessment_id": assessment_id}

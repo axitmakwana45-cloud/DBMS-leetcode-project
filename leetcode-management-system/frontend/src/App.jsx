@@ -320,6 +320,7 @@ function CompanyPortal({ user, onLogout }) {
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [duration, setDuration] = useState("60");
+  const [totalMarks, setTotalMarks] = useState("100");
   const [problemIds, setProblemIds] = useState([]);
   const [developerIds, setDeveloperIds] = useState([]);
   const [participants, setParticipants] = useState(null);
@@ -341,7 +342,10 @@ function CompanyPortal({ user, onLogout }) {
     try {
       await request("/api/company/assessments", { method: "POST", body: JSON.stringify({
         title, description, start_at: new Date(startAt).toISOString(), end_at: new Date(endAt).toISOString(),
-        duration_minutes: Number(duration), problem_ids: problemIds, developer_ids: developerIds
+        duration_minutes: Number(duration),
+        total_marks: Number(totalMarks),
+        problem_ids: problemIds,
+        developer_ids: developerIds
       })});
       setNotice("Assessment created and selected developers assigned.");
       setShowForm(false); setTitle(""); setDescription(""); setProblemIds([]); setDeveloperIds([]);
@@ -386,6 +390,16 @@ function CompanyPortal({ user, onLogout }) {
             <label className="loginField"><span>End date and time</span><input required type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)} /></label>
           </div>
           <label className="loginField"><span>Duration (minutes)</span><input required type="number" min="1" max="1440" value={duration} onChange={e => setDuration(e.target.value)} /></label>
+          <label className="loginField">
+            <span>Total Marks</span>
+            <input
+              required
+              type="number"
+              min="1"
+              value={totalMarks}
+              onChange={e => setTotalMarks(e.target.value)}
+            />
+          </label>
           <h3>Programming problems ({problemIds.length} selected)</h3>
           <div className="selectionList">{options.problems.map(problem => <label key={problem.id}><input type="checkbox" checked={problemIds.includes(problem.id)} onChange={() => toggle(setProblemIds, problemIds, problem.id)} /> {problem.title} <small>#{problem.id}</small></label>)}</div>
           <h3>Assign developers ({developerIds.length} selected)</h3>
@@ -964,8 +978,23 @@ function DashboardChart({ title, type, items }) {
   );
 }
 
+function SectionTitle({ title, subtitle }) {
+  return (
+    <div className="userSectionTitle">
+      <div>
+        <h2>{title}</h2>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
 function Empty({ text }) {
   return <div className="empty">{text}</div>;
+}
+
+function UserStat({ label, value, icon }) {
+  return <div className="userStat"><span className="userStatIcon">{icon}</span><div><small>{label}</small><strong>{value ?? "—"}</strong></div></div>;
 }
 
 function RecordModal({ mode, row, columns, onClose, onSave }) {
